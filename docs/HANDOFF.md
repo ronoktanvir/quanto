@@ -1,5 +1,12 @@
 # Resume here
 
+## Git integration and storage design checkpoint
+
+PR10 merged as a6184238b89c7180b82f8fa2af4b40043f514a02 after Checks41430727555 succeeded on exact head449b4a1621bdac25a34acdc6f236895eb92dbdcf. Current branch feat/runpod-recovery is fast-forwarded to that merge. The isolated prompt worktree is clean with only expendable test caches, but archive_worktree refused because another active task still uses it; leave it attached rather than bypassing ownership.
+
+D009_POLICY.md records five independent perspectives and both actual completed CLI reviews. Fable requestcli-300d49b1a9864a70ac5ca3f69c14a76c and Opus requestcli-1f02f16af8cf4f87a0b3594aeb9b44f6; packet40c34299f3b686a2b8134bf7d08f5f52518eeecbf2fc040737ade3982c917b2c. Both exactmodels completedone turn; USD2 combined conservativeholds stayuncertain. NoAPIcouncil, no repeatedrequest. Firststage resource/canary implementation and independentchecks are inprogress; noactualcreate/uploadyet. age1.3.2 wasinstalledfromHomebrewcore; no unrelatedtaptrustsettingschanged. Dailycost/healthheartbeat is beingprepared; it isnotyet active.
+
+
 ## Prompt integration after completed retained-result audit
 
 The isolated prompt commit was cherry-picked as `f44c30d`. Exact packet/test bytes match independent critic/quality identities; root lint and repository hygiene checks pass. Separate actual quality and scope accepted the retained partial numerical evidence and narrow prompt integration. Do not run old current-source verifiers against this changed packet identity. No new paid workflow or allocation increase occurred. GitHub integration is next; D009 storage work stays a separate increment.

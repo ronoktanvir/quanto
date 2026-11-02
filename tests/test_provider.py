@@ -196,3 +196,75 @@ def test_malformed_hidden_or_unknown_content_remains_uncertain(tmp_path, fake_ke
         call(tmp_path, transport=lambda *_: result)
     with Journal(tmp_path / "runtime/research.sqlite") as journal:
         assert journal.connection.execute("SELECT state FROM reservations").fetchone()[0] == "uncertain"
+
+
+def test_research_http_response_hash_binds_exact_bytes_and_shortens_read_deadline(monkeypatch):
+    from types import SimpleNamespace
+    from quanto.ledger import hash_bytes
+
+    raw = b'{ "type": "message", "model": "synthetic" }\n'
+    timeouts, opens = [], []
+
+    class Response:
+        def __init__(self):
+            self.parts = [raw[:10], raw[10:], b""]
+            self.fp = SimpleNamespace(raw=SimpleNamespace(
+                _sock=SimpleNamespace(settimeout=timeouts.append)))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def isclosed(self):
+            return False
+
+        def read1(self, maximum):
+            part = self.parts.pop(0)
+            assert len(part) <= maximum
+            return part
+
+    class Opener:
+        def open(self, request, *, timeout):
+            opens.append((request, timeout))
+            return Response()
+
+    monkeypatch.setattr(provider, "build_opener", lambda *_: Opener())
+    result, digest = provider._send_research(b"{}", "synthetic", timeout=5, maximum=1000)
+    assert result == {"type": "message", "model": "synthetic"}
+    assert digest == hash_bytes(raw)
+    assert digest != hash_bytes(provider.canonical_json(result).encode())
+    assert len(opens) == 1 and opens[0][0].method == "POST"
+    assert all(0 < value <= 5 for value in timeouts)
+    assert timeouts == sorted(timeouts, reverse=True)
+
+
+@pytest.mark.parametrize("raw,maximum", [
+    (b'{"model":"first","model":"second"}', 1000),
+    (b"x" * 101, 100),
+])
+def test_research_wire_bytes_refuse_duplicate_keys_or_overflow(monkeypatch, raw, maximum):
+    from types import SimpleNamespace
+
+    class Response:
+        def __init__(self):
+            self.parts = [raw, b""]
+            self.fp = SimpleNamespace(raw=SimpleNamespace(_sock=SimpleNamespace(settimeout=lambda _: None)))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def isclosed(self):
+            return False
+
+        def read1(self, size):
+            return self.parts.pop(0)
+
+    monkeypatch.setattr(provider, "build_opener", lambda *_: SimpleNamespace(
+        open=lambda *args, **kwargs: Response()))
+    with pytest.raises(LedgerError):
+        provider._send_research(b"{}", "synthetic", timeout=5, maximum=maximum)

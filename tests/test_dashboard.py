@@ -101,6 +101,37 @@ def test_only_fixed_assets_and_health_are_available_without_snapshot(desk, route
     assert headers["X-Frame-Options"] == "DENY"
 
 
+def test_dependency_graph_preserves_edges_when_completion_changes(desk, status):
+    request, path, _ = desk
+    status["milestones"].append({"id": "m2", "title": "Next step", "status": "pending",
+                                 "evidence": "Await earlier check."})
+    edge = {"from": "m1", "to": "m2", "reason": "The earlier check supplies evidence."}
+    status["dependencies"] = [edge]
+    write_status(path, status)
+    first = json.loads(request("/api/status")[2])
+    assert first["dependencies"] == [edge]
+    status["milestones"][0]["status"] = "completed"
+    write_status(path, status)
+    second = json.loads(request("/api/status")[2])
+    assert second["milestones"][0]["status"] == "completed"
+    assert second["dependencies"] == first["dependencies"]
+
+
+@pytest.mark.parametrize("edges", [
+    [{"from": "m1", "to": "missing", "reason": "Unknown prerequisite"}],
+    [{"from": "m1", "to": "m2", "reason": "First"},
+     {"from": "m2", "to": "m1", "reason": "Cycle"}],
+    [{"from": "m1", "to": "m2", "reason": "First"},
+     {"from": "m1", "to": "m2", "reason": "Duplicate"}],
+])
+def test_dependency_graph_rejects_unknown_cycles_and_duplicate_edges(status, edges):
+    status["milestones"].append({"id": "m2", "title": "Next step", "status": "pending",
+                                 "evidence": "Synthetic fixture"})
+    status["dependencies"] = edges
+    with pytest.raises(ValueError, match="Dependency"):
+        validate_status(status)
+
+
 @pytest.mark.parametrize("route", [
     "/runtime/status.json", "/docs/CONTEXT.md", "/../AGENTS.md", "/%2e%2e/AGENTS.md",
     "/web/../../AGENTS.md", "/assets/", "//example.com/api/status", "/api/anything",

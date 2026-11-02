@@ -172,7 +172,7 @@ class Conversations:
                 if parsed.tzinfo is not None:
                     stamps.append(parsed.astimezone(timezone.utc).isoformat())
             allowed = {key: snapshot.get(key) for key in
-                       ("observed_at", "project", "milestones", "decisions", "blockers", "budget")}
+                       ("observed_at", "project", "milestones", "dependencies", "decisions", "blockers", "budget")}
             allowed["agents"] = [a for a in snapshot.get("agents", [])
                                  if isinstance(a, dict) and
                                  (agent_id == "desk_helper" or a.get("id") == agent_id)]

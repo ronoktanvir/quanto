@@ -84,6 +84,35 @@ def validate_status(data: object) -> None:
         if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
             raise ValueError(f"Status snapshot contains an invalid budget {field}.")
 
+    # Optional recorded prerequisite graph. Status changes never create edges.
+    dependencies = data.get("dependencies", [])
+    if not isinstance(dependencies, list) or len(dependencies) > 256:
+        raise ValueError("Dependencies must be a bounded list.")
+    identifiers = {item["id"] for item in data["milestones"]}
+    outgoing = {identifier: [] for identifier in identifiers}
+    incoming = dict.fromkeys(identifiers, 0)
+    seen = set()
+    for edge in dependencies:
+        strings(edge, ("from", "to", "reason"))
+        pair = (edge["from"], edge["to"])
+        if (pair[0] not in identifiers or pair[1] not in identifiers
+                or pair in seen or pair[0] == pair[1] or len(edge["reason"]) > 500):
+            raise ValueError("Dependency references must be unique known milestones.")
+        seen.add(pair)
+        outgoing[pair[0]].append(pair[1])
+        incoming[pair[1]] += 1
+    ready = [identifier for identifier in identifiers if incoming[identifier] == 0]
+    visited = 0
+    while ready:
+        identifier = ready.pop()
+        visited += 1
+        for following in outgoing[identifier]:
+            incoming[following] -= 1
+            if incoming[following] == 0:
+                ready.append(following)
+    if visited != len(identifiers):
+        raise ValueError("Dependency graph must not contain a cycle.")
+
 
 def make_server(
     root: Path, host: str = "127.0.0.1", port: int = 8765, *, transport=None

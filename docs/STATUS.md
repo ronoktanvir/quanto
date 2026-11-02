@@ -18,7 +18,7 @@ The final policy revision and admission succeeded, followed by two complete regi
 
 ## Repository and local operations
 
-The repository remains private at https://github.com/ronoktanvir/quanto. PRs #1–#3 merged after CI. Current work is on `feat/historical-admission` in [draft PR #4](https://github.com/ronoktanvir/quanto/pull/4); the actual pilot is complete; final PR integration and CI checks are still required before merge. Earlier GitHub checks do not certify the new head.
+The repository remains private at https://github.com/ronoktanvir/quanto. PRs #1–#4 merged after CI. [PR #4](https://github.com/ronoktanvir/quanto/pull/4) merged as `5722f10a7a23c1c492a47196ce0959365044cd46` after Checks run41396742589 succeeded on final head `373d315aed4a843a90bd54c51f08d7d66a1f4abf`. Current work continues on `feat/protected-research` for the next operation requirements. The preserved review records describe their actual pre-merge checkpoints.
 
 The personal dashboard at http://127.0.0.1:8766/ displays recorded assignments, evidence, dependencies, conversations and freshness. Its supervisor captures status every 300 seconds while this Mac is awake and signed in. At05:42UTC readiness returned200; the last capture succeeded at 05:38:07UTC and next attempt was due05:43:07UTC. Runtime metadata is authoritative. The earlier malformed-status failure and subsequent recovery remain preserved. Native-agent observations are lead-recorded, not continuous telemetry.
 

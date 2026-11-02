@@ -2,7 +2,21 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
-## Actual D008 stopped-workflow checkpoint — start here
+## Two actual stopped workflows — current checkpoint
+
+Current branch `feat/research-acceptance`, base merge `bc44fa9f8d7eada9f00077cb5793c7e031e885ff`. PR7 passed Checks41412648942 on exact head42da74137abecf8a0cc72525b0889b677acd690f before merge. The goal remains active and incomplete. No third paid attempt is authorized as a blind repeat.
+
+Revised runtime/d008/operational-outcome-v2.json: submission `53f4e0299a3240a8800d4fd586827a5b`, record `734987d8f470680caa7070af4c05496cb4f78898875613482916517e576b661a`. Director proceeded; hypothesis stopped with null predicate. Two actual claude-haiku-5-5 responses; zero engineer/financial work/later reviewers. Per-run settled$0.006466, retained research-purpose holds$0.150085. Do not infer this cost from the global daily delta, which includes other cooperating usage. Earlier three-response stop is preserved separately below.
+
+Read D008-revised-operational-critic/quality/scope.md. New proof/config/role/fence/packet/request/body bindings verify. Numerical/oracle counts are zero, not successful checks. Inspector initially assumed monotonic timestamps inside authorization; actual append order was correct. Corrected inspector versions/outputs preserve that harness issue. No workflow rerun occurred.
+
+Reporting P2 closed for future outputs: both original stopped receipts contain method_no_blockers despite no reviewers. Root correction in research_broker.py/test_research_broker.py counts only published stages: none=>not_reached, subset=>incomplete, full roster=>explicit decision. Just observing a final model response without handoff cannot clear review. Correction commit eb47a7203107bcd9b91439ab5b7fd2808d38246a passed independent criticism (22 broker tests plus failed-first-review probe) and separate quality (44 targeted broker/CLI/integration cases in source and clean installation, lint and1296 classification/publication/refusal probes). Read D008-reporting-quality.md and revised-operational-scope.md for final dispositions before Git integration. Old receipts are never rewritten.
+
+Next substantive work: properly qualified applicability of historical failures under the later D007 policy. FailureMemory absent disposition defaults unresolved; corrected is only a recorded claim and broker projection omits important evidence/availability qualification. Do not blindly toggle the two original refusals corrected or claim this caused the stop. Derive exact scoped policy/source/refusal/current-admission relations and obtain independent review before another actual attempt. Broader model research competence, R14 persistence, protected evaluation, scheduling/restore, paper and live readiness remain incomplete.
+
+Private revised inspectors are runtime/d008/inspect-revised-trace.py and verify-actual-workflow-v2.py; original harnesses/output remain preserved. Current reports/source hashes govern replayable evidence. No raw result, provider record, predicate truth or rationale belongs in model context or Git.
+
+## First actual stopped-workflow checkpoint — historical
 
 PR6 merged as `2dd9ab00fc7c9b6354ca409bba4bd51d7a890d0f` after Checks41409644486 passed on exact head47d2a0f481a74e2ed9855c16b49eeb040728d0f3. Current branch `feat/research-operation`. The full goal remains active.
 

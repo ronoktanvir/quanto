@@ -20,6 +20,12 @@ After PR6 merged, the first actual cycle produced three observed Haiku responses
 
 The actual trace exposed a source-level description error missed by synthetic review: the packet called the unchanged SMA method a trailing-return rule. A neutral method label is required. The proposed bounded correction also communicates supervisor-derived current roster/common-specification integrity and clarifies that execution requests a test rather than certifying its predicate. No raw observations, private rule parameters or result truth are needed. The method description defect is established; whether it caused the stop remains an interpretation. Fresh source/egress checks and independent reviews must precede a distinct registered attempt. The original packet, responses, objections and stopped outcome remain unchanged.
 
+### Revised actual stop and reporting/memory limitations
+
+After the method correction passed independent criticism,1133 source/clean tests plus12 subtests, scope and PR7 CI, a distinct registered attempt produced two real Haiku responses and stopped at hypothesis. Its corrected proof bindings and exact run-specific costs were independently verified; it launched no calculation. The two observed stops do not isolate a prompt or model cause. No third attempt has run.
+
+The audit identified an empty-review reporting error: method_no_blockers was emitted without any review roles. Future summaries must distinguish not_reached, incomplete and a full explicit review decision, counting only published stage records; old receipts remain preserved with this correction in their interpretation. Separately, failure memory defaults absent disposition to unresolved. That is the absence of an appended correction claim, not proof of current applicability. D007 later admitted a new reviewed policy/source lineage and did not declare the earlier refusals erroneous. Any future contextual relation needs exact policy/source/request ancestry and qualified claim/review/availability evidence. Blindly setting corrected to obtain a model proceed is not acceptable.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

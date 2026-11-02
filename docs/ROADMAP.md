@@ -12,6 +12,8 @@ US markets come first, followed by crypto. The bounded private Alpaca acquisitio
 
 Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Use the owner-requested local Claude Code login for actual Fable and Opus council criticism, with bounded sanitized packets and recorded model outcomes. Earlier direct API reviews remain historical evidence; website chats are separate.
 
+D008 now supplies local issued assignments, fenced stage transitions, exact handoffs and bounded failure retrieval. Next implement the deterministic typed tool broker, transmission gate and bounded model transport, then observe a real five-role historical development workflow. State-machine fixtures do not close that requirement. Keep research scheduling/restore and protected evaluation as separate acceptance stages.
+
 ## Controlled evaluation and operation
 
 Freeze specifications, gate final evaluation, track exposure, and prevent misleading pass labels. Add durable scheduling, stale worker fencing, bounded retries, artifact reconciliation, backup restore, operator dashboard, and unattended-run evidence.

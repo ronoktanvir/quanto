@@ -1,6 +1,8 @@
 # Current status
 
-D007 implementation and source semantics have passed separate criticism and scope review. Independent quality reports 808 tests plus 12 subtests in both the source environment and a clean installation, with lint passing. The actual historical pilot is complete: all three cost scenarios passed admission and calculation, exact deliberate replays matched, and the independent oracle matched294 fields per scenario (882 total). The complete private operation remains unfinished; nothing is trading and no strategy is validated.
+D008 has an accepted staged policy and a new local role-state/failure-memory foundation. Actual Fable and Opus terminal reviews completed through the existing Claude Code OAuth login. Independent implementation criticism closed two defects; separate quality passed870 tests plus12 subtests in both source and clean installation, with lint and independent recovery/integration probes. Separate scope review confines acceptance to this foundation. This foundation does not run the five operational research models, execute a new historical study, isolate final data or schedule research.
+
+The prior D007 implementation and source semantics have passed separate criticism and scope review. Independent quality reports 808 tests plus 12 subtests in both the source environment and a clean installation, with lint passing. The actual historical pilot is complete: all three cost scenarios passed admission and calculation, exact deliberate replays matched, and the independent oracle matched294 fields per scenario (882 total). The complete private operation remains unfinished; nothing is trading and no strategy is validated.
 
 ## Verified increment
 
@@ -18,11 +20,11 @@ The final policy revision and admission succeeded, followed by two complete regi
 
 ## Repository and local operations
 
-The repository remains private at https://github.com/ronoktanvir/quanto. PRs #1–#3 merged after CI. Current work is on `feat/historical-admission` in [draft PR #4](https://github.com/ronoktanvir/quanto/pull/4); the actual pilot is complete; final PR integration and CI checks are still required before merge. Earlier GitHub checks do not certify the new head.
+The repository remains private at https://github.com/ronoktanvir/quanto. PRs #1–#4 merged after CI. [PR #4](https://github.com/ronoktanvir/quanto/pull/4) merged as `5722f10a7a23c1c492a47196ce0959365044cd46` after Checks run41396742589 succeeded on final head `373d315aed4a843a90bd54c51f08d7d66a1f4abf`. Current work continues on `feat/protected-research` for the next operation requirements. The preserved review records describe their actual pre-merge checkpoints.
 
-The personal dashboard at http://127.0.0.1:8766/ displays recorded assignments, evidence, dependencies, conversations and freshness. Its supervisor captures status every 300 seconds while this Mac is awake and signed in. At05:42UTC readiness returned200; the last capture succeeded at 05:38:07UTC and next attempt was due05:43:07UTC. Runtime metadata is authoritative. The earlier malformed-status failure and subsequent recovery remain preserved. Native-agent observations are lead-recorded, not continuous telemetry.
+The personal dashboard at http://127.0.0.1:8766/ displays recorded assignments, evidence, dependencies, conversations and freshness. Its supervisor captures status every 300 seconds while this Mac is awake and signed in. At06:26UTC readiness returned200; the last capture succeeded at06:23:35UTC and next attempt was due06:28:35UTC. Runtime metadata is authoritative. The earlier malformed-status failure and subsequent recovery remain preserved. Native-agent observations are lead-recorded, not continuous telemetry.
 
-The cooperating ledger last showed $0.979279 settled API usage and $17 of unreconciled CLI holds, within the $20 America/Los_Angeles daily cap. CLI list-price estimates are not invoices. No new subscription or credit purchase is authorized.
+At06:17UTC the cooperating ledger showed $0.979279 settled API usage and $19 of unreconciled CLI holds, committing$19.979279 of the $20 November1 America/Los_Angeles daily cap. CLI list-price estimates are not invoices. No new subscription or credit purchase is authorized.
 
 ## Remaining operation
 

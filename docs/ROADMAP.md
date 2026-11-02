@@ -6,7 +6,7 @@ Establish private GitHub repository, small commits, contribution/security guidan
 
 ## Reproducible research
 
-US markets come first, followed by crypto. The bounded private Alpaca acquisition and provenance increment is implemented; the next financial milestone is supported historical-data admission and corporate-action accounting. Keep synthetic fixtures separate. Verify time integrity, costs, adjustments, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly, with a concrete implementation path retained.
+US markets come first, followed by crypto. The bounded private Alpaca acquisition and provenance increment is implemented; a bounded historical split/dividend pilot has now passed admission, exact replay and independent accounting comparison; the next research milestone is protected evaluation and persistent operational roles. Keep synthetic fixtures separate. Verify time integrity, costs, adjustments, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly, with a concrete implementation path retained.
 
 ## Persistent agent desk
 

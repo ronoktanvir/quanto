@@ -1,0 +1,21 @@
+# D007 post-pilot scope and no-drift review
+
+Reviewer: independent scope adviser `/root/d007_scope`; prepared 2026-11-02 UTC. This review updates the D007 scope conclusion without altering the separately retained pre-pilot assessment in [D007-implementation-scope.md](D007-implementation-scope.md), whose bytes are part of the registered policy lineage.
+
+## Evidence inspected and limits
+
+I reviewed the sanitized [D007 historical pilot record](D007-historical-pilot.md), SHA-256 `de9cacf6caf47b4e3f7a7a4552d117319108a4af0968246fa04513e7df6e2fed`, and the current STATUS, REQUIREMENTS, HANDOFF, and pre-pilot scope report. The pilot report contains identifiers, counts, hashes and engineering outcomes, not private prices, source-record payloads, portfolio values or return tables. I did not inspect runtime receipts, credentials, private values, or results; did not run the portfolio, tests, or oracle; and made no external call. The calculations and verification described below were executed by the lead. This is an independent scope review of the recorded evidence, not independent numerical replication.
+
+## Bounded pilot finding
+
+The sanitized report records successful evidence-bound admission and a complete pre-registered suite at 0, 10 and 25 bps. Each scenario was deliberately replayed: fingerprints and result artifact hashes matched, while submissions and attempt IDs remained distinct. All six study attempts used the same 20 warmup and 28 evaluation sessions. Both strategy and benchmark recorded one split, dividend accrual, and dividend payment. The unchanged independent oracle reportedly passed 294 fields for each scenario, 882 comparisons total. The report identifies the admission, suite, verification, result, and journal artifacts. It also records and preserves the failed oracle-payload preparation attempt, which stopped before oracle invocation or portfolio recomputation, and its correction before successful comparisons.
+
+These results close the bounded actual-data calculation, exact replay, and numerical-comparison requirement for D006/D007 as reported. They do not establish source truth through the oracle, broker settlement or spendable funds, strategy merit, profitability, or deployability. The result is retrospective development evidence: the policy followed observation of the due-bill field, and the full acquired range remains exposed. The original `identity_change_unresolved` and `unsupported_due_bill` refusals remain historically valid and preserved; D007 is a new policy, not a claim that either refusal was erroneous.
+
+**Disposition:** D007 meets its scoped historical-pilot acceptance criteria on the sanitized evidence. The implementation criticism, independent quality review, semantic review and this scope disposition are separate roles; none should be merged into a claim of universal financial correctness. Private PR/CI integration remains pending, so this report is not a merge, clean-checkout, or current-head CI certification. Preserve private repository visibility and keep raw source, bars, result tables, credentials and runtime artifacts out of Git and external-model packets.
+
+## Remaining operation and documentation claims
+
+The complete objective remains incomplete. Protected final evaluation, five persistent operational research roles, searchable failure retrieval, durable research scheduling and restore, prospective paper operation, broader US coverage, later crypto work, and separately credentialed execution with explicit owner activation remain required. No live order was placed or authorized by this pilot.
+
+Status and HANDOFF should now say the bounded pilot succeeded and PR/CI integration remains pending; they should not continue saying D007 admission or calculation is unattempted. In REQUIREMENTS, R02 and R03 should cite their revision-specific critic and quality reports; R04 should cite both scope stages without suggesting the whole operation is finished; and R11 may record the verified bounded accounting/timing/cost/replay/oracle path while retaining wider warehouse and strategy-validation limits. R10 and R13–R19 remain incomplete where their required evidence is absent. A successful pilot is a completed research increment, not a completed research-and-trading operation or an investment-performance claim.

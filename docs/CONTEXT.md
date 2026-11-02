@@ -37,3 +37,7 @@ The full objective remains active. Credentials and live trading approval are fut
 The owner rejected a company-landing-page appearance. The local interface is a compact personal management workspace, with work and operations first. It must include an interactive milestone dependency diagram that updates from the same recorded progress as the board. Arrows represent recorded prerequisites, not actual inter-agent messages or automatic promotion decisions.
 
 The latest reporting preference is a background status capture every five minutes, with last attempt, last success and countdown to the next attempt displayed. Captures are operational observations, not fabricated updates to native-agent progress. They must continue while the local supervisor runs even if the page is closed.
+
+## Verified historical increment
+
+D007 now supports a narrow independently reviewed regular-way economic split abstraction. The actual saved historical pilot passed admission, all three frozen cost cases, exact deliberate replays and independent oracle comparison (294 fields per scenario). Full lineage retains both prior refusals and two post-acquisition changes. This is retrospective development evidence, not a holdout, validated strategy or brokerage-settlement model. Implementation and semantic reviews are distinct; post-pilot reviewers received only sanitized metadata/permitted harness code. See STATUS and the D007 historical pilot report for current integration state.

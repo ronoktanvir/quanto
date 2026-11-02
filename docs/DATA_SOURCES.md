@@ -33,10 +33,11 @@ Credentials are read only from the owner's local `.env`: `APCA_API_KEY_ID` and `
 
 ## Network and failure bounds
 
-The central allowlist permits only these routes, and validates it before invoking even a test transport:
+The central allowlist permits only the following routes, and validates it before invoking even a test transport. The corporate-action extension belongs to D006 and is documented separately:
 
 - `GET https://data.alpaca.markets/v2/stocks/{symbol}/bars`, with fixed daily SIP/USD parameters, explicit raw/all adjustment, and `asof=-` disabling automatic historical symbol mapping.
 - `GET https://paper-api.alpaca.markets/v2/calendar`, with explicit start/end parameters. This is a calendar read, not an order operation. The [calendar reference](https://docs.alpaca.markets/us/v1.4.2/reference/getcalendar-1) describes market dates, opening/closing times, and early closures.
+- `GET https://data.alpaca.markets/v1/corporate-actions`, with explicit symbol/process dates and fixed all-category US parameters. [Action sources](ACTION_SOURCES.md) describes this extension's preservation, normalization and limits.
 
 The direct TLS client has no proxy, redirect, retry, or trading route. Limits are eight bar pages, 1,000 requested rows per page, 10,000 normalized rows, 2 MiB per response, 8 MiB per acquisition, and a 60-second elapsed deadline. Sequential requests within an acquisition are separated by at least one second; this is not an account-wide concurrent-client rate limiter. Socket operations use timeouts of at most 15 seconds and the remaining acquisition deadline. An over-deadline response is rejected. OS DNS resolution is not strictly cancellable by the socket timeout, so this is not yet a hard process-level wall-clock guarantee during a resolver stall.
 
@@ -54,7 +55,7 @@ Alpaca's [aggregation rules](https://docs.alpaca.markets/us/docs/market-data-faq
 
 Calendar datasets use `kind: exchange_calendar`, with ordered date/open/close sessions and aware New York timestamps. They preserve early closing times and raw source bytes, but use `calendar_status: provider_calendar_received_not_independently_certified`. Empty calendar responses, including a weekend-only window, currently produce `empty_coverage`; they do not establish a complete empty schedule. Calendar receipts do not automatically certify associated price coverage.
 
-Research admission remains blocked until the separate boundary establishes an appropriate calendar comparison, corporate-action coverage and accounting policy, information-time/execution assumptions, and any required source-use review. Multi-decade delisted history, point-in-time universes and fundamentals, empirical execution costs, and prospective paper trading remain future work. The adapter never invokes the backtest engine or a broker order API.
+Acquisition alone never grants research admission. The separate D006 boundary checks source receipts, calendar comparisons, supported corporate actions, attributed issuer facts and a source-use review for conditional retrospective development research. The software passed independent verification. Two actual admission refusals are preserved; the pilot currently requires a separately reviewed split-entitlement policy before calculation. Multi-decade delisted history, point-in-time universes and fundamentals, empirical execution costs, and prospective paper trading remain future work. The adapter never invokes the backtest engine or a broker order API.
 
 ## Verification scope
 

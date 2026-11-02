@@ -6,11 +6,11 @@ Establish private GitHub repository, small commits, contribution/security guidan
 
 ## Reproducible research
 
-US markets come first, followed by crypto. The bounded private Alpaca acquisition and provenance increment is implemented; the next financial milestone is supported historical-data admission and corporate-action accounting. Keep synthetic fixtures separate. Verify time integrity, costs, adjustments, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly, with a concrete implementation path retained.
+US markets come first, followed by crypto. The bounded private Alpaca acquisition and provenance increment is implemented; a bounded historical split/dividend pilot has now passed admission, exact replay and independent accounting comparison; the next research milestone is protected evaluation and persistent operational roles. Keep synthetic fixtures separate. Verify time integrity, costs, adjustments, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly, with a concrete implementation path retained.
 
 ## Persistent agent desk
 
-Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Continue genuine Opus criticism under the existing shared budget controls; the account is configured and actual reviews have completed.
+Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Use the owner-requested local Claude Code login for actual Fable and Opus council criticism, with bounded sanitized packets and recorded model outcomes. Earlier direct API reviews remain historical evidence; website chats are separate.
 
 ## Controlled evaluation and operation
 

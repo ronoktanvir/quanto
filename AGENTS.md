@@ -14,6 +14,8 @@ The lead integrates work. Delegate isolated files/modules and state ownership. U
 
 Criticism, quality validation, and no-drift review are separate roles. A producer cannot certify its own work as independent review. Reviewers must identify the exact revision/artifacts inspected. Preserve objections and fixes. Routine implementation choices within an approved decision do not need a new five-agent panel.
 
+The owner's latest council preference is to invoke Fable and Opus through the existing local Claude Code terminal session, not through direct Anthropic API calls. Use the signed-in CLI route, keep review packets sanitized, record the actual responding model and terminal outcome, and do not silently replace an unavailable model. Do not load the project's API key into council CLI processes. Existing dashboard chats are a separate API-backed feature; this council preference does not request changing them. No new subscription or credit purchase is authorized.
+
 ## Evidence and engineering
 
 Use explicit evidence kinds: synthetic_fixture, historical_market_data, prospective_paper, live_execution. Tests on synthetic fixtures validate software, not investment performance. Record every attempted experiment, including invalid, failed, and rejected runs. Persist code/specification/data identities and assumptions. Do not call SQLite immutable: use append-only application records and tested tamper evidence with a documented threat model.

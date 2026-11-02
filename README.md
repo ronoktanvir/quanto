@@ -37,7 +37,7 @@ PYTHONPATH=src .venv/bin/python -m quanto acquire-calendar --request examples/re
 PYTHONPATH=src .venv/bin/python -m quanto submissions --limit 20
 ```
 
-The helper preserves existing settings and writes `.env` with owner-only permissions. The adapter allows only specific historical-data, calendar and corporate-action reads. Downloaded data remains inspection-only until the separate admission checks pass. The historical-accounting software passed independent review; the actual pilot remains refused under its current split-entitlement policy. Each deliberate acquisition is a new recorded attempt; no automatic retry or feed substitution occurs. See [Data sources](docs/DATA_SOURCES.md) for coverage and rights limitations.
+The helper preserves existing settings and writes `.env` with owner-only permissions. The adapter allows only specific historical-data, calendar and corporate-action reads. Downloaded data remains inspection-only until the separate admission checks pass. The historical-accounting software and bounded D007 pilot passed independent review; both earlier admission refusals remain preserved. Each deliberate acquisition is a new recorded attempt; no automatic retry or feed substitution occurs. See [Data sources](docs/DATA_SOURCES.md) for coverage and rights limitations.
 
 Run a separate synthetic example to compare two lookbacks over identical evaluation dates, repeat one candidate under another name, and retain a malformed request:
 
@@ -68,6 +68,11 @@ can run. `run-suite` preserves every outcome and records a deliberate replay as 
 new invocation. See [policy revisions](docs/POLICY_REVISIONS.md) and
 [study suites](docs/STUDY_SUITES.md). These controls and the bounded actual historical pilot passed separate criticism,
 quality and scope review. They do not establish a trading edge.
+
+D008 adds a [development role-state and failure-memory foundation](docs/RESEARCH_WORKFLOW.md).
+Issued identities, fenced handoffs and bounded retrieval are local libraries;
+operational model dispatch, the actual five-role historical workflow and protected
+evaluation still require integration and independent acceptance.
 
 ## Conversations and costs
 

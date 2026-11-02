@@ -1,5 +1,15 @@
 # Decision register
 
+## D008 Durable research roles and protected evaluation
+
+Status: accepted staged contract in [D008_POLICY.md](D008_POLICY.md), after five separately briefed perspectives and completed actual Fable5.1/Opus5.5 reviews through local Claude Code OAuth. Both exact model identities and one-turn terminal outcomes were observed. The reviewers received the complete proposal and explicitly attributed lead summaries; they did not inspect the full adviser reports or implementation. Full visible responses and dissent are retained in D008-fable-cli.md and D008-opus-cli.md. Shared model lineages and a common lead limit independence.
+
+The native perspectives cover evaluation, operational roles, data boundaries, reliability and scope. Their shared recommendation is two separate tracks: real operational research on development evidence, and a reservation-first evaluator. The accepted corrections prohibit director expansion of evidence access, require interval-aware protection against legacy refreshes, treat visible paper observations as development exposure, separate protected reviewers from selectors, retain uncertain costs across council/API paths, and require atomic fenced publication. Statistical inference and future performance acceptance remain separately reviewed gates. The power-at-threshold suggestion is expressly qualified for the proposed null hypothesis rather than adopted without analysis.
+
+The first implementation adds only a fenced seven-stage local state library and bounded searchable failure memory. It does not dispatch models, execute a historical workflow, reserve protected observations or schedule unattended research. Separate implementation criticism found and independently rechecked fixes for capability-token echoes in metadata and missing denial audit events. Independent quality and scope evidence, exact code identities, and integration state are tracked in STATUS and the D008 foundation reports. R14 and the full operation remain incomplete.
+
+The D008 council pair reserved USD2 atomically before dispatch and retained both holds as uncertain. With earlier holds, the cooperating November1 Los Angeles ledger committed USD19.979279 of20 at the recorded checkpoint. CLI list-price estimates are not invoices and do not release those holds. The current day and runtime ledger govern later work; no purchase, fallback or paid retry occurred.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

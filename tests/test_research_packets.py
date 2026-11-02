@@ -6,7 +6,8 @@ import json
 import pytest
 
 from quanto.research_packets import (
-    FAILURE_CODES, FINDING_CODES, MAX_OUTPUT_BYTES, MAX_PACKET_BYTES, METHOD, PREDICATES,
+    FAILURE_ARTIFACT_STATES, FAILURE_CODES, FAILURE_FIELDS, FAILURE_RELATIONS,
+    FINDING_CODES, MAX_OUTPUT_BYTES, MAX_PACKET_BYTES, METHOD, PREDICATES,
     SUITE_INTEGRITY, SYSTEM_PROMPT, PacketError, packet_messages, parse_role_output,
     project_role_output, validate_packet, validate_projection,
 )
@@ -39,7 +40,10 @@ def packet(role="hypothesis", **changes):
         "data_values_disclosed": False, "allowed_predicates": sorted(PREDICATES),
         "artifact_aliases": ["artifact-1", "artifact-2"],
         "failures": [{"alias": "failure-1", "code": "unsupported_due_bill",
-                      "status": "invalid", "disposition": "unresolved"}],
+                      "status": "invalid", "disposition": "unresolved",
+                      "disposition_recorded": False, "provisional": True,
+                      "artifact_state": "not_allowed", "disposition_artifact_state": "none",
+                      "relation": "no_relation_established"}],
         "prior_outputs": [project_role_output(output("director"))],
         "execution_state": "not_requested",
     }
@@ -209,6 +213,146 @@ def test_failure_projection_is_finite(field, value):
     source["failures"][0][field] = value
     with pytest.raises(PacketError):
         validate_packet(source)
+
+
+@pytest.mark.parametrize("field", sorted(FAILURE_FIELDS))
+def test_failure_context_requires_every_exact_qualification(field):
+    source = packet()
+    del source["failures"][0][field]
+    with pytest.raises(PacketError, match="packet_fields_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("disposition_recorded", 0), ("disposition_recorded", 1),
+    ("disposition_recorded", None), ("disposition_recorded", "false"),
+    ("disposition_recorded", []), ("disposition_recorded", {}),
+    ("provisional", False), ("provisional", 1), ("provisional", 0),
+    ("provisional", None), ("provisional", "true"), ("provisional", []),
+    ("artifact_state", "repair_verified"), ("artifact_state", True),
+    ("artifact_state", {"sha256": "a" * 64}),
+    ("disposition_artifact_state", "reviewed"), ("disposition_artifact_state", None),
+    ("disposition_artifact_state", ["verified"]),
+    ("relation", "resolved_under_reviewed_revision"), ("relation", "current_safe"),
+    ("relation", True), ("relation", []), ("relation", {"outcome": True}),
+])
+def test_failure_qualifications_reject_wrong_types_and_stronger_claims(field, value):
+    source = packet()
+    source["failures"][0][field] = value
+    with pytest.raises(PacketError):
+        validate_packet(source)
+
+
+def test_absent_disposition_cannot_be_projected_as_a_corrected_claim():
+    source = packet()
+    source["failures"][0].update(disposition="corrected", disposition_recorded=False,
+                                  disposition_artifact_state="verified")
+    with pytest.raises(PacketError, match="packet_failure_state_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("state", ["not_allowed", "verified", "unavailable", "verification_bound"])
+def test_absent_disposition_cannot_claim_linked_disposition_evidence(state):
+    source = packet()
+    source["failures"][0]["disposition_artifact_state"] = state
+    with pytest.raises(PacketError, match="packet_failure_state_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("changes", [
+    {"disposition_artifact_state": "none"}, {"status": "pending"},
+])
+def test_corrected_claim_requires_fix_evidence_state_and_a_historical_outcome(changes):
+    source = packet()
+    source["failures"][0].update(disposition="corrected", disposition_recorded=True,
+                                  disposition_artifact_state="verified")
+    source["failures"][0].update(changes)
+    with pytest.raises(PacketError, match="packet_failure_state_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("status", ["failed", "interrupted", "rejected", "pending", "uncertain"])
+def test_positive_revision_relation_requires_original_invalid_status(status):
+    source = packet()
+    source["failures"][0].update(status=status, relation="prior_refusal_in_bound_revision")
+    with pytest.raises(PacketError, match="packet_failure_state_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("state", sorted(FAILURE_ARTIFACT_STATES))
+def test_failure_and_recorded_disposition_evidence_states_are_preserved_without_upgrade(state):
+    source = packet()
+    source["failures"][0].update(disposition_recorded=True, artifact_state=state,
+                                  disposition_artifact_state=state)
+    checked = validate_packet(source)["failures"][0]
+    assert checked["artifact_state"] == state
+    assert checked["disposition_artifact_state"] == state
+    assert checked["provisional"] is True
+    assert checked["status"] == "invalid"
+    assert checked["disposition"] == "unresolved"
+
+
+@pytest.mark.parametrize("relation", sorted(FAILURE_RELATIONS))
+def test_relation_does_not_rewrite_historical_status_or_default_disposition(relation):
+    source = packet()
+    source["failures"][0]["relation"] = relation
+    checked = validate_packet(source)["failures"][0]
+    assert checked["status"] == "invalid"
+    assert checked["disposition"] == "unresolved"
+    assert checked["disposition_recorded"] is False
+    assert checked["relation"] == relation
+
+
+@pytest.mark.parametrize("state", ["verified", "unavailable", "not_allowed", "verification_bound"])
+def test_recorded_corrected_claim_keeps_provisional_and_evidence_availability(state):
+    source = packet()
+    source["failures"][0].update(disposition="corrected", disposition_recorded=True,
+                                  disposition_artifact_state=state)
+    checked = validate_packet(source)["failures"][0]
+    assert checked["status"] == "invalid"
+    assert checked["disposition"] == "corrected"
+    assert checked["provisional"] is True
+    assert checked["disposition_artifact_state"] == state
+
+
+@pytest.mark.parametrize("private", [
+    "/private/failure.json", "2026-11-02", "provider-record-AAPL", "sk-ant-private",
+    "a" * 64, [100.5, 101.5], {"prices": [100, 101], "dates": ["2026-11-02"]},
+])
+def test_new_failure_fields_have_no_private_data_or_free_prose_channel(private):
+    for field in ("artifact_state", "disposition_artifact_state", "relation",
+                  "disposition_recorded", "provisional"):
+        source = packet()
+        source["failures"][0][field] = private
+        with pytest.raises(PacketError) as exc:
+            packet_messages(source)
+        assert str(private) not in str(exc.value)
+
+
+@pytest.mark.parametrize("extra", [
+    {"fix_artifact_ref": "a" * 64}, {"request_sha256": "b" * 64},
+    {"failure_id": "private-provider-id"}, {"rationale": "private failure prose"},
+    {"date": "2026-11-02"}, {"prices": [100, 101]}, {"predicate_holds": True},
+    {"reviewed_repair": True},
+])
+def test_failure_context_refuses_extra_reference_outcome_and_review_claim_fields(extra):
+    source = packet()
+    source["failures"][0].update(extra)
+    with pytest.raises(PacketError, match="packet_fields_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_failure_relation_and_verified_bytes_do_not_preclude_stop_or_block(role):
+    source = packet(role)
+    source["failures"][0].update(relation="prior_refusal_in_bound_revision",
+                                  disposition="corrected", disposition_recorded=True,
+                                  artifact_state="verified", disposition_artifact_state="verified")
+    validate_packet(source)
+    decision = "stop" if role in ROLES[:3] else "block"
+    checked = parse(output(role, decision=decision), role=role,
+                    required=PREDICATE if role in ROLES[2:] else None)
+    assert checked["decision"] == decision
 
 
 def test_finite_vocabularies_and_duplicate_failure_aliases():

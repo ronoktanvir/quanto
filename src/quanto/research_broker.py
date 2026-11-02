@@ -226,6 +226,21 @@ def _finish(store, submission, status, record):
     return {**record, "submission_id": submission, "status": status, "artifact_sha256": artifact}
 
 
+def _review_outcome(projections, stages):
+    published = {s["role"] for s in stages}
+    reviews = [p for p in projections if p["role"] in REVIEW_ROLES and p["role"] in published]
+    if not reviews:
+        return "not_reached"
+    if len(reviews) != len(REVIEW_ROLES) or {p["role"] for p in reviews} != set(REVIEW_ROLES):
+        return "incomplete"
+    decisions = {p["decision"] for p in reviews}
+    if "block" in decisions:
+        return "blocked"
+    if decisions == {"no_blocking_method_issue"}:
+        return "method_no_blockers"
+    return "inconclusive"
+
+
 def _dispatch_counts(store, workflow_id):
     """Authorization/response counts are not a claim of billed network calls."""
     if workflow_id is None or not store.journal.connection.execute(
@@ -297,7 +312,7 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
         raw = canonical_json(request) if isinstance(request, dict) else request
         submission = store.begin("research_broker_run", raw)
         workflow_id = None
-        stages, private_refs = [], []
+        stages, private_refs, previous = [], [], []
         try:
             config = _configuration(raw, transport is not None)
             _schema(store)
@@ -337,7 +352,7 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                 store.journal.connection.execute("INSERT INTO research_broker_runs VALUES (?,?,?,?,?)", (
                     submission, config["run_key"], workflow_id, config_ref, hash_json(identity)))
             dispatcher = ResearchDispatcher(workflow)
-            previous, facts, execution = [], [], "not_requested"
+            facts, execution = [], "not_requested"
             projection_refs = {}
             for role in ROLES:
                 if code_identity() != identity:
@@ -437,15 +452,12 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
             completed = len(stages) == len(ROLES)
             if code_identity() != identity:
                 raise BrokerError("broker_code_changed")
-            review_decisions = [p["decision"] for p in previous if p["role"] in REVIEW_ROLES]
-            review_outcome = ("blocked" if "block" in review_decisions else "inconclusive"
-                              if "inconclusive" in review_decisions else "method_no_blockers")
             record = {"workflow_run_id": workflow_id, "configuration_sha256": config_ref,
                       "code_identity": identity, "evidence_kind": config["evidence_kind"],
                       "stages": stages, "private_tool_refs": private_refs,
                       "dispatch_counts": _dispatch_counts(store, workflow_id), "all_stages_completed": completed,
                       "all_models_actual": completed and all(s["model_receipt"]["actual_model_evidence"] for s in stages),
-                      "review_outcome": review_outcome, "execution_state": execution,
+                      "review_outcome": _review_outcome(previous, stages), "execution_state": execution,
                       "operational_acceptance": False, "investment_validation": False,
                       "limitations": ["method_only_model_reviews", "separate_actual_trace_review_required",
                                       "no_unattended_scheduler", "no_protected_evaluator"]}
@@ -456,6 +468,7 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                 return _finish(store, submission, "invalid", {
                     "error_code": code, "workflow_run_id": workflow_id, "completed_stages": len(stages),
                     "stages": stages, "dispatch_counts": _dispatch_counts(store, workflow_id),
+                    "review_outcome": _review_outcome(previous, stages),
                     "operational_acceptance": False,
                     "note": "Started effects remain retained; no automatic retry or resume."})
             except (ProvenanceError, LedgerError, OSError, sqlite3.Error):

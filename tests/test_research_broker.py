@@ -66,6 +66,7 @@ def test_complete_real_composition_fresh_suite_and_no_private_context(tmp_path, 
     result = run_workflow(tmp_path, configuration, transport=model)
     assert result["status"] == "success", result
     assert result["all_stages_completed"] and not result["all_models_actual"]
+    assert result["review_outcome"] == "method_no_blockers"
     assert result["operational_acceptance"] is result["investment_validation"] is False
     assert result["dispatch_counts"] == {"authorized": 7, "response_observed": 7}
     assert [c["role"] for c in model.contexts] == list(ROLES)
@@ -166,19 +167,48 @@ def test_critic_block_is_retained_without_stopping_remaining_reviews_or_claiming
     assert result["all_stages_completed"] and result["operational_acceptance"] is False
 
 
-def test_director_stop_does_not_execute_study(tmp_path, configuration):
-    model = ModelFixture(stop="director")
+@pytest.mark.parametrize("role,count", [("director", 1), ("hypothesis", 2), ("engineer", 3)])
+def test_stop_does_not_execute_study_or_claim_reviews(tmp_path, configuration, role, count):
+    model = ModelFixture(stop=role)
     result = run_workflow(tmp_path, configuration, transport=model)
-    assert result["status"] == "invalid" and len(model.contexts) == 1
+    assert result["status"] == "invalid" and len(model.contexts) == count
+    assert result["review_outcome"] == "not_reached"
     with Provenance(tmp_path) as store:
         assert not store.list_submissions(kind="study_suite_run")
-        assert store.journal.connection.execute("SELECT state FROM workflow_terminals").fetchone()[0] == "blocked"
+        assert store.journal.connection.execute(
+            "SELECT state FROM workflow_terminals ORDER BY rowid DESC LIMIT 1").fetchone()[0] == "blocked"
+
+
+def test_partial_review_keeps_objections_without_claiming_complete_review(tmp_path, configuration):
+    result = run_workflow(tmp_path, configuration,
+                          transport=ModelFixture(block="data_critic", malformed="scope"))
+    assert result["status"] == "invalid" and result["review_outcome"] == "incomplete"
+    with Provenance(tmp_path) as store:
+        stage = next(s for s in result["stages"] if s["role"] == "data_critic")
+        assert store.read_json(stage["projection_sha256"])["decision"] == "block"
+
+
+def test_unpublished_last_review_cannot_report_all_clear(tmp_path, configuration, monkeypatch):
+    from quanto.research_workflow import ResearchWorkflow, WorkflowError
+    original = ResearchWorkflow.finish_handoff
+
+    def fail_scope(self, token, worker, fence, handoff):
+        assignment = self._leased(token, worker, fence, self.journal._now())
+        if assignment["role"] == "scope":
+            raise WorkflowError("synthetic publication refusal")
+        return original(self, token, worker, fence, handoff)
+
+    monkeypatch.setattr(ResearchWorkflow, "finish_handoff", fail_scope)
+    result = run_workflow(tmp_path, configuration, transport=ModelFixture())
+    assert result["status"] == "invalid" and result["review_outcome"] == "incomplete"
+    assert len(result["stages"]) == 6
 
 
 def test_malformed_model_is_retained_uncertain_without_paid_retry(tmp_path, configuration):
     model = ModelFixture(malformed="hypothesis")
     result = run_workflow(tmp_path, configuration, transport=model)
     assert result["status"] == "invalid" and len(model.contexts) == 2
+    assert result["review_outcome"] == "not_reached"
     assert result["dispatch_counts"] == {"authorized": 2, "response_observed": 2}
     with Provenance(tmp_path) as store:
         assert store.journal.budget_snapshot()["uncertain_count"] == 1

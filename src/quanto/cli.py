@@ -98,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         ("register-policy-revision", "Preserve and validate post-acquisition policy lineage"),
         ("register-suite", "Register all three cost scenarios before calculation"),
         ("run-suite", "Execute a complete registered scenario roster once"),
+        ("run-research", "Run one bounded model-role workflow under the daily cap; no trades"),
         ("explore", "Record and execute an eligible exploratory study"),
     ):
         command = sub.add_parser(name, help=description)
@@ -121,6 +122,15 @@ def main(argv: list[str] | None = None) -> int:
             from quanto.critic import request_review
             output = request_review(root, args.packet.read_text())
             output = {key: value for key, value in output.items() if key != "text"}
+        elif args.command == "run-research":
+            from quanto.research_broker import run_workflow
+            result = run_workflow(root, _request_text(args.request))
+            # Exact private records remain local; the default display is lifecycle only.
+            output = {key: result[key] for key in (
+                "submission_id", "status", "artifact_sha256", "workflow_run_id", "error_code",
+                "dispatch_counts", "all_stages_completed", "all_models_actual", "review_outcome",
+                "execution_state", "operational_acceptance", "investment_validation"
+            ) if key in result}
         elif args.command in {"acquire-bars", "acquire-calendar", "acquire-actions",
                               "register-dataset", "admit-dataset", "explore", "register-split-review",
                               "register-policy-revision", "register-suite", "run-suite"}:

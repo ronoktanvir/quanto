@@ -484,7 +484,7 @@ class ResearchWorkflow:
                     contract["backend"] == "synthetic" or not contract["max_spend_micro_usd"]
                 ):
                     raise WorkflowError("Assignment has no paid model dispatch allowance")
-                if not set(refs) <= set(json.loads(a["input_refs"])):
+                if not set(refs) <= set(self._available_refs_locked(a, fence)):
                     raise WorkflowError("Reference was not issued to this assignment")
                 self._verify_refs(refs, contract["max_input_bytes"])
                 existing = self.db.execute("SELECT * FROM workflow_intents WHERE assignment_id=? AND request_id=?",
@@ -508,6 +508,28 @@ class ResearchWorkflow:
             self._deny("authorize_intent")
             raise
 
+    def _available_refs_locked(self, assignment, fence):
+        """Only issued inputs and this claim's successful broker results."""
+        refs = set(json.loads(assignment["input_refs"]))
+        for row in self.db.execute(
+            "SELECT o.artifact_refs FROM workflow_effect_outcomes o JOIN workflow_intents i "
+            "USING(assignment_id,request_id) WHERE o.assignment_id=? AND i.fence=? AND o.status='success'",
+            (assignment["assignment_id"], fence),
+        ):
+            refs.update(json.loads(row["artifact_refs"]))
+        refs = _refs(sorted(refs))
+        self._verify_refs(refs, json.loads(assignment["contract"])["max_input_bytes"])
+        return refs
+
+    @_record_denial
+    def available_input_refs(self, token, worker_id, fence):
+        """Derive bounded inputs after a successful same-assignment tool step."""
+        with self.journal._transaction():
+            assignment = self._leased(token, worker_id, fence, self.journal._now())
+            refs = self._available_refs_locked(assignment, fence)
+            self._leased(token, worker_id, fence, self.journal._now())
+            return refs
+
     def _intent(self, assignment, request_id, fence):
         _identifier(request_id)
         row = self.db.execute("SELECT * FROM workflow_intents WHERE assignment_id=? AND request_id=?",
@@ -525,19 +547,25 @@ class ResearchWorkflow:
         this first increment. Never retry a start that reports an error.
         """
         with self.journal._transaction():
-            now = self.journal._now()
-            a = self._leased(token, worker_id, fence, now)
-            intent = self._intent(a, request_id, fence)
-            self._verify_refs(json.loads(intent["input_refs"]), json.loads(a["contract"])["max_input_bytes"])
-            if self.db.execute("SELECT 1 FROM workflow_effect_starts WHERE assignment_id=? AND request_id=?",
-                               (a["assignment_id"], request_id)).fetchone():
-                raise WorkflowError("Effect entitlement already consumed; do not retry")
-            now = self.journal._now()
-            self._leased(token, worker_id, fence, now)
-            self.db.execute("INSERT INTO workflow_effect_starts VALUES (?,?,?)",
-                            (a["assignment_id"], request_id, self.journal._stamp(now)))
-            self._event("effect_started", {"assignment_id": a["assignment_id"],
-                                           "request_id": request_id, "fence": fence}, now)
+            return self._start_intent_locked(token, worker_id, fence, request_id)
+
+    def _start_intent_locked(self, token, worker_id, fence, request_id):
+        """Broker hook; caller must hold the journal write transaction."""
+        if not self.db.in_transaction:
+            raise WorkflowError("Effect start requires an atomic transaction")
+        now = self.journal._now()
+        a = self._leased(token, worker_id, fence, now)
+        intent = self._intent(a, request_id, fence)
+        self._verify_refs(json.loads(intent["input_refs"]), json.loads(a["contract"])["max_input_bytes"])
+        if self.db.execute("SELECT 1 FROM workflow_effect_starts WHERE assignment_id=? AND request_id=?",
+                           (a["assignment_id"], request_id)).fetchone():
+            raise WorkflowError("Effect entitlement already consumed; do not retry")
+        now = self.journal._now()
+        self._leased(token, worker_id, fence, now)
+        self.db.execute("INSERT INTO workflow_effect_starts VALUES (?,?,?)",
+                        (a["assignment_id"], request_id, self.journal._stamp(now)))
+        self._event("effect_started", {"assignment_id": a["assignment_id"],
+                                       "request_id": request_id, "fence": fence}, now)
 
     @_record_denial
     def finish_intent(self, token, worker_id, fence, request_id, *, status,
@@ -548,41 +576,51 @@ class ResearchWorkflow:
         JSON by the broker. This method verifies bytes, not their data rights.
         A changed/wrong model is an invalid terminal outcome, never a fallback.
         """
+        with self.journal._transaction():
+            return self._finish_intent_locked(
+                token, worker_id, fence, request_id, status=status,
+                artifact_refs=artifact_refs, observed_model=observed_model)
+
+    def _finish_intent_locked(self, token, worker_id, fence, request_id, *, status,
+                              artifact_refs, observed_model=None):
+        """Broker hook; same publication checks inside an existing transaction."""
+        if not self.db.in_transaction:
+            raise WorkflowError("Effect finish requires an atomic transaction")
         refs = _refs(artifact_refs)
         if status not in ("success", "failed", "invalid", "uncertain"):
             raise WorkflowError("Unsupported effect outcome")
-        with self.journal._transaction():
-            now = self.journal._now()
-            a = self._leased(token, worker_id, fence, now)
-            intent = self._intent(a, request_id, fence)
-            contract = json.loads(a["contract"])
-            if observed_model is not None:
-                _identifier(observed_model)
-                self._screen(observed_model)
-            if intent["action"] == "dispatch_model":
-                if observed_model != contract["requested_model"]:
-                    status = "invalid"
-            elif observed_model is not None:
-                raise WorkflowError("Only model dispatch can report a responding model")
-            if not self.db.execute("SELECT 1 FROM workflow_effect_starts WHERE assignment_id=? AND request_id=?",
-                                   (a["assignment_id"], request_id)).fetchone():
-                raise WorkflowError("Effect was never started")
-            if self.db.execute("SELECT 1 FROM workflow_effect_outcomes WHERE assignment_id=? AND request_id=?",
+        now = self.journal._now()
+        a = self._leased(token, worker_id, fence, now)
+        intent = self._intent(a, request_id, fence)
+        contract = json.loads(a["contract"])
+        if observed_model is not None:
+            _identifier(observed_model)
+            self._screen(observed_model)
+        if intent["action"] == "dispatch_model":
+            if ((observed_model is not None or status == "success")
+                    and observed_model != contract["requested_model"]):
+                status = "invalid"
+        elif observed_model is not None:
+            raise WorkflowError("Only model dispatch can report a responding model")
+        if not self.db.execute("SELECT 1 FROM workflow_effect_starts WHERE assignment_id=? AND request_id=?",
                                (a["assignment_id"], request_id)).fetchone():
-                raise WorkflowError("Effect outcome is already terminal")
-            if status == "success" and not refs:
-                raise WorkflowError("Successful effect requires exact result artifacts")
-            self._verify_refs(refs, contract["max_output_bytes"])
-            now = self.journal._now()
-            self._leased(token, worker_id, fence, now)
-            self.db.execute("INSERT INTO workflow_effect_outcomes VALUES (?,?,?,?,?,?)",
-                            (a["assignment_id"], request_id, status, canonical_json(refs),
-                             observed_model, self.journal._stamp(now)))
-            self._event("effect_finished", {"assignment_id": a["assignment_id"],
-                                            "request_id": request_id, "status": status,
-                                            "artifact_refs": refs, "observed_model": observed_model}, now)
-            if status != "success":
-                self._terminal(a, status, "effect_" + status, now)
+            raise WorkflowError("Effect was never started")
+        if self.db.execute("SELECT 1 FROM workflow_effect_outcomes WHERE assignment_id=? AND request_id=?",
+                           (a["assignment_id"], request_id)).fetchone():
+            raise WorkflowError("Effect outcome is already terminal")
+        if status == "success" and not refs:
+            raise WorkflowError("Successful effect requires exact result artifacts")
+        self._verify_refs(refs, contract["max_output_bytes"])
+        now = self.journal._now()
+        self._leased(token, worker_id, fence, now)
+        self.db.execute("INSERT INTO workflow_effect_outcomes VALUES (?,?,?,?,?,?)",
+                        (a["assignment_id"], request_id, status, canonical_json(refs),
+                         observed_model, self.journal._stamp(now)))
+        self._event("effect_finished", {"assignment_id": a["assignment_id"],
+                                        "request_id": request_id, "status": status,
+                                        "artifact_refs": refs, "observed_model": observed_model}, now)
+        if status != "success":
+            self._terminal(a, status, "effect_" + status, now)
 
     @_record_denial
     def finish_handoff(self, token, worker_id, fence, handoff):

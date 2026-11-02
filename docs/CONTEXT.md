@@ -16,13 +16,14 @@ The original inspiration is QuantGPT: market history, deterministic backtests, m
 - Distinct criticism, quality validation, and no-drift oversight.
 - GitHub repository initially private, healthy commits and PR practice, prepared for possible future public release.
 - A clean localhost dashboard must visualize actual agent assignments, work, reviews, and progress, with truthful freshness and evidence.
+- Market priority: both US markets and crypto, with US stocks/ETFs first. The owner approved Alpaca as the first US-data provider. Paper-account keys are configured locally; bounded historical-bar and calendar requests succeeded.
 - Asynchronous questions; independent work continues while answers or credentials are pending.
 
 ## Current interaction and operation design
 
 The operator requested a Google DeepMind-inspired local interface, distinct agent icons, planned/active/completed work, conversations about each role, a larger desk helper, and continuous website supervision. Role chats use new contextual Haiku assistants; the desk helper uses Opus. Original worker inquiries use a separate durable inbox and only actual worker responses may be recorded. Assistants have no tools or trading authority. The local service runs while this Mac is awake and signed in.
 
-The Anthropic credential is now configured in the ignored local .env. Two actual Opus reviews were received, totaling $0.309208 in calculated usage charges before interactive tests. Both requested model IDs were confirmed by the provider model listing. The starting-environment section below is historical.
+The Anthropic credential is configured in the ignored local .env. Three actual Opus architecture reviews were received; D005's completed review cost $0.197620. Project-wide accounting was $0.562722 after that review, including earlier chat/incident checks; the runtime ledger is authoritative for later usage. Both requested model IDs were confirmed by the provider model listing. The starting-environment section below is historical.
 
 ## Verified starting environment
 

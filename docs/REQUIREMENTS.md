@@ -5,18 +5,18 @@ No item is complete merely because a document or test name exists. Inspect imple
 | ID | Required outcome | Evidence required | Status |
 | --- | --- | --- | --- |
 | R01 | Lead orchestration with bounded agent roles | Actual delegated work, integrated output, role permissions | In progress |
-| R02 | Independent criticism | Revision-linked adversarial findings and resolved/blocking dispositions | Core and interaction findings corrected; snapshot increment independently reviewed at recorded hashes |
-| R03 | Separate quality validation | Independently executed numerical, failure, integration checks | Core Decimal/persistence and independent HTTP checks passed for this increment |
-| R04 | Separate no-drift review | Full requirement-to-evidence audit by reviewer | Foundation and interface audits received; handoff corrected, D004 archive gap retained |
+| R02 | Independent criticism | Revision-linked adversarial findings and resolved/blocking dispositions | D005-implementation-critic.md records five corrected findings, final hashes and 149 passing targeted tests |
+| R03 | Separate quality validation | Independently executed numerical, failure, integration checks | D005-quality.md records 364 passing tests plus 12 subtests, independent failure/privacy scenarios and a clean installed example |
+| R04 | Separate no-drift review | Full requirement-to-evidence audit by reviewer | D005-scope-audit.md confirms the complete roadmap remains intact and actual pilot exposure is registered; D004 archive gap retained |
 | R05 | Persistent contextualization | CONTEXT, STATUS, ROADMAP, DECISIONS, HANDOFF current after integration | Maintained per increment; full-operation gaps remain explicit |
-| R06 | Five-perspective significant decisions | Five separate perspectives, synthesis, dissent, rationale | D001 recorded; D004 perspectives received but per-adviser archive incomplete; actual Opus review recorded |
-| R07 | Cross-model criticism | Actual requested provider/model response and usage record | Two actual Opus responses; one complete, one truncated; dispositions in DECISIONS |
+| R06 | Five-perspective significant decisions | Five separate perspectives, synthesis, dissent, rationale | D001 recorded; D005 has five full attributed reports, synthesis and dissent; D004 per-adviser archive remains incomplete |
+| R07 | Cross-model criticism | Actual requested provider/model response and usage record | Three actual Opus architecture responses; D004 and D005 complete, first review truncated; provenance and dispositions recorded |
 | R08 | No subscriptions; API ceiling | No purchases; race-tested reservations and daily reporting | No purchases; reservation, dispatch and provider controls tested and reviewed for cooperating project callers |
-| R09 | Healthy private GitHub repository | Remote visibility, coherent history, PRs, CI, contribution/security guidance | Private repository; coherent PR #1 passed CI and merged; follow-ups use feature PRs |
-| R10 | Real-data warehouse | Repeatable ingestion, provenance, timestamps, hashes, rights, quality checks | Pending |
+| R09 | Healthy private GitHub repository | Remote visibility, coherent history, PRs, CI, contribution/security guidance | Private repository; PRs #1 and #2 passed CI and merged; D005 uses PR #3, whose final remote state is on GitHub |
+| R10 | Real-data warehouse | Repeatable ingestion, provenance, timestamps, hashes, rights, quality checks | Bounded Alpaca pilot acquired with hashes/receipts; complete warehouse, admission, action handling and rights scope remain incomplete |
 | R11 | Deterministic research engine | Reconciled accounting, timing, costs, repeatability and independent fixtures | Synthetic single-symbol core verified; real-data/timing/corporate-action scope incomplete |
-| R12 | Complete experiment/failure memory | Durable all-attempt ledger, version identity, searchable failures | Storage primitives tested; complete workflow/retrieval pending |
-| R13 | Enforced research protocol | Frozen specs, protected evaluation, exposure tracking, criteria, role separation | Pending |
+| R12 | Complete experiment/failure memory | Durable all-attempt ledger, version identity, searchable failures | Bounded submission history and registered exploration independently verified; complete research retrieval remains incomplete |
+| R13 | Enforced research protocol | Frozen specs, protected evaluation, exposure tracking, criteria, role separation | Development exposure and common-window synthetic studies implemented; protected final access and authenticated role separation pending |
 | R14 | Persistent five-role research operation | Observed end-to-end role execution on real data with real reviews | Pending |
 | R15 | Reliable bounded scheduling | Restart, lease/fencing, retry, budget and artifact integrity tests | Job/budget primitives tested; full research scheduling pending; website supervision covered by R21 |
 | R16 | Usable localhost operator surface | Actual agent assignments/work/reviews, freshness, runs/evidence/costs/decisions; eventual stop/resume and runbook | Personal management interface verified at wide/narrow widths; tasks, chats and dependency map working |

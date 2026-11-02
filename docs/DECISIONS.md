@@ -63,3 +63,34 @@ Pricing sources: https://platform.claude.com/docs/en/models/opus-5-5/overview an
 ## Interface preference correction
 
 The owner explicitly rejected a company-landing-page composition. The dashboard must prioritize management: compact navigation, active and planned work, blockers, evidence, costs, operations and persistent conversations. Large promotional headings and decorative hero sections are removed. This is a direct user preference within D004, not a change to the research architecture.
+
+## D005 US-first provenance and registered exploration
+
+Status: accepted as an implementation increment after five independently briefed perspectives and a completed actual Opus critique. Implementation passed 364 tests plus 12 subtests, with separate completed criticism, quality and scope reports. [PR #3](https://github.com/ronoktanvir/quanto/pull/3) records the private integration and its final remote checks. This does not complete the warehouse, research protocol or full operation.
+
+The owner selected US markets and crypto with US first, and approved Alpaca. Use documented delayed historical SIP access without buying a subscription. An actual account response must establish entitlement; API documentation alone does not establish data-use rights, point-in-time history, complete calendars or corporate-action treatment. Keep market data private and out of external-model packets.
+
+The five complete reports preserve recommendations, objections and attribution:
+
+- [Data integrity](reviews/D005-data-integrity.md): preserve information-time, revision, symbol-mapping and corporate-action limitations.
+- [Source access and rights](reviews/D005-data-sources.md): Alpaca historical SIP and a possible direct SEC receipt; exclude unreviewed crypto/FRED shortcuts.
+- [Evaluation](reviews/D005-evaluation.md): register invalid submissions, verify actual bytes and compare lookbacks over common scored dates.
+- [Reliability and cost](reviews/D005-operations.md): separate acquisition identity from experiment identity; bound requests, storage and interrupted attempts.
+- [Scope fidelity](reviews/D005-scope.md): acquire actual US-source evidence and record exploratory exposure now without shrinking the full objective.
+
+[Actual Opus critique](reviews/D005-opus.md) completed with the exact requested model, 17,780 input tokens and 6,325 output tokens, costing USD 0.197620. It reviewed the proposal and adviser reports, not the implementation. Agreement among these reports is not statistical independence or implementation certification.
+
+Selected implementation: a private content-addressed artifact store; append-only submission/outcome records before semantic validation or network calls; a bounded fixed-endpoint Alpaca adapter; normalized inspection receipts; and a registered exploratory runner with shared evaluation dates, actual input/code identities, candidate-versus-retry accounting and application-tracked exposure. Acquired pilot ranges are development-only with unknown prior exposure. The owner-authorized CLI may acquire data; model conversations receive no acquisition or trading tools.
+
+Outside-review dispositions:
+
+- B1 accepted: allow a separate exact GET path for the paper-account calendar endpoint. A price-data-only host cannot establish exchange-session coverage. No broader trading API allowlist is authorized.
+- B2 partly corrected: the proposed submission record stores a request hash and size, not arbitrary raw request text. Raw artifacts still need audited tombstone/purge support; add it, reject known credential echoes before storage, and never call the store immutable.
+- B3 accepted as an enforcement limit: paper keys are not inherently read-only. Keep keys in private task configuration, never argv or exported agent environments; enforce method/host/path in the transport. Do not claim OS isolation against the owner or privileged agents. Requiring the owner to type every authorized acquisition command is unnecessary within the existing delegated task.
+- B4 identifies a real gap. Raw-versus-adjusted comparison can report provider adjustments, but identical prices and an empty action response do not prove absence. Do not convert that heuristic into verified absence. Acquire inspection evidence now; historical calculation remains gated until supported action accounting and an explicit admission standard are implemented. This unresolved financial capability is the next engine milestone, not a permanent definition of success.
+- B5 accepted: hash and verify existing objects, write atomically, preserve unfinished attempts and partial receipts, and never infer success after interruption. Any deliberate re-fetch is a new attempt.
+- Record exploratory access/selection over the whole pilot range now. Protected final-access enforcement, genuinely separated workers and prospective paper evidence remain later required milestones.
+
+SEC acquisition is optional for this increment and requires truthful identifying contact configuration. Do not invent it merely to obtain a receipt. No source rights are certified by model review; record the actual reviewed terms and permitted use before broader retention, redistribution or model transmission. The full roadmap remains authoritative.
+
+Actual private Alpaca acquisition succeeded for raw bars, adjusted bars and calendar sessions. Both datasets were registered as inspection-only with whole-pilot development exposure. Historical calculation was refused by the admission gate, as required. Independent implementation review reproduced and corrected loaded-code identity, joined-transaction rollback, mutable dictionary requests, pending CLI exit status and bounded credential-file reading. The implementation review preserves original findings and final inspected hashes; this evidence does not grant historical-data admission or investment validation.

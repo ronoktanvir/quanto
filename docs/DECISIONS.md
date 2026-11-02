@@ -66,7 +66,7 @@ The owner explicitly rejected a company-landing-page composition. The dashboard 
 
 ## D005 US-first provenance and registered exploration
 
-Status: accepted as an implementation increment after five independently briefed perspectives and a completed actual Opus critique. Implementation passed 364 tests plus 12 subtests and independent criticism; final quality/scope records and the private feature PR are being completed. It does not complete the warehouse, research protocol or full operation.
+Status: accepted as an implementation increment after five independently briefed perspectives and a completed actual Opus critique. Implementation passed 364 tests plus 12 subtests, with separate completed criticism, quality and scope reports. [PR #3](https://github.com/ronoktanvir/quanto/pull/3) records the private integration and its final remote checks. This does not complete the warehouse, research protocol or full operation.
 
 The owner selected US markets and crypto with US first, and approved Alpaca. Use documented delayed historical SIP access without buying a subscription. An actual account response must establish entitlement; API documentation alone does not establish data-use rights, point-in-time history, complete calendars or corporate-action treatment. Keep market data private and out of external-model packets.
 

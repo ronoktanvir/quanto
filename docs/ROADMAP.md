@@ -6,11 +6,11 @@ Establish private GitHub repository, small commits, contribution/security guidan
 
 ## Reproducible research
 
-Ingest free real data with provenance. Keep synthetic fixtures separate. Verify time integrity, costs, accounting, adjustments, corporate actions, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly.
+US markets come first, followed by crypto. The bounded private Alpaca acquisition and provenance increment is implemented; the next financial milestone is supported historical-data admission and corporate-action accounting. Keep synthetic fixtures separate. Verify time integrity, costs, adjustments, missing sessions, and reproducible artifacts. Expand provider coverage only under documented rights. Unsupported features reject explicitly, with a concrete implementation path retained.
 
 ## Persistent agent desk
 
-Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Integrate genuine Opus criticism with measured cost controls once configured.
+Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Continue genuine Opus criticism under the existing shared budget controls; the account is configured and actual reviews have completed.
 
 ## Controlled evaluation and operation
 

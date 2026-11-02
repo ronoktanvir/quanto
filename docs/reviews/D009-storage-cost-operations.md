@@ -1,0 +1,27 @@
+# D009 independent perspective: storage cost and operations
+
+## Recommendation
+
+Proceed with one 10 GB standard network volume in US-WA1, budgeted at about **$0.70 per 30-day month** at Runpod's current $0.07/GB/month standard rate. The project reports roughly 10 MB of local runtime and data, so this leaves substantial headroom while avoiding a much larger, irreversible initial allocation. The selected region and standard tier are available according to the lead's current catalog check; CA2 is premium-only. Recheck price, tier, location, mount and account balance in the console immediately before provisioning.
+
+This recommendation authorizes only the already approved storage setup, within the cumulative $50 Runpod ceiling and roughly $5/month target. It does not authorize compute rental, a second paid storage service, an increased model budget, or spending beyond that ceiling. The Runpod charge is separate from the USD20/day model ceiling and USD4/day research-purpose allowance.
+
+## Cost controls and lifecycle
+
+Runpod bills standard network volume storage hourly, including when no Pod is attached. Its published default account limit is $80/hour across resources, which does not enforce this project's $50 cumulative ceiling. The service therefore cannot be treated as the project budget guard. Keep auto-pay off, avoid creating any Pod/CPU/GPU/serverless resource, retain a local cumulative ledger of deposits and observed storage charges, and inspect Runpod billing and resources at least weekly during setup and monthly thereafter. Stop new transfers or size increases if actual cumulative Runpod spending approaches $45; obtain a new owner decision before crossing $50. The $5 buffer covers billing timing or small discrepancies and is not extra authorization.
+
+Runpod uses prepaid credits, deducts charges continuously, and says credits are non-refundable. Confirm the console's minimum top-up and current balance before funding; fund only an amount within the $50 cumulative cap and count the entire deposit against it. Set a low-balance notification above the amount needed for at least two months of storage. Do not rely on a zero balance as a shutdown mechanism: Runpod says storage charges continue after Pods stop and an unfunded volume may eventually be terminated with unrecoverable data.
+
+Do not use scheduled deletion or automatic expiry as a budget control. The network volume is the only authorized remote checkpoint, and deleting it could destroy the only off-Mac copy. If continuing storage is no longer useful or remaining budget approaches the limit, first create and verify an encrypted export to an already-authorized local destination, inspect its manifest and hashes, and confirm a restore; then ask the owner before deleting the remote copy. No new backup service or subscription is implied.
+
+## Transfer and restore gate
+
+Keep the current project data local until the destination and backup procedure are concrete. Before transfer, confirm the account identity, volume ID/region/tier/size, data rights and eligible paths, mount/access procedure, current balance and notifications. Exclude `.env`, API keys, credentials, raw licensed data and any data not approved for external storage. Encrypt the export before upload, record a manifest with file paths, byte sizes, hashes, creation time and source revision, and upload only the selected checkpoint. Verify remote hashes against the manifest. Then retrieve that checkpoint into a clean temporary location and verify hashes and a usable restore before treating it as an accepted external checkpoint. Keep credentials in ignored local files; never put them in the archive, shell output, logs or Git.
+
+A Runpod network volume persists independently of Pods, but it is a single-region provider resource, not an independent disaster-recovery provider. A volume constrains attached Pods to its data center, data does not synchronize to other volumes automatically, and unpaid storage can be terminated. The local copy plus this remote copy is the bounded recovery arrangement for this stage; availability during provider/account failure is not guaranteed. Revisit redundancy only if a second destination is separately authorized.
+
+## Evidence and remaining gates
+
+Runpod's current documentation prices standard network storage at $0.07/GB/month under 1 TB, bills network volumes hourly, says volume size can be increased but not decreased, and warns storage may be deleted after an account remains unfunded. It documents S3-compatible file access without launching compute, which is the preferred transfer route if its access test succeeds. Official references: [network volumes](https://docs.runpod.io/storage/network-volumes), [billing overview](https://docs.runpod.io/accounts-billing/billing), [account spend limits](https://docs.runpod.io/accounts-billing/manage-accounts), and [S3-compatible API](https://docs.runpod.io/storage/s3-api).
+
+Lead reports that the management API works, no volumes currently exist, and the catalog offers standard US-WA1 and premium-only CA2. I did not access the account or provision resources. Before data moves, still verify authenticated access to file contents through the selected storage path, encrypted export/restore, alert configuration, and a written cumulative spend ledger. Storage provisioning itself remains an owner-authorized action; transfer remains gated on these checks. External-model review, if unavailable, remains pending rather than satisfied.

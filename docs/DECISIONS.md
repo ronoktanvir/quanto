@@ -34,6 +34,8 @@ The implementation retains a private original retrieval basis and revalidates th
 
 The exact qualified-context increment subsequently merged in PR9 after all three independent reviews and final-head CI. This completes implementation integration only; it does not convert either stopped actual trace into a successful workflow.
 
+The distinct third attempt used that merged context and a fresh request after separate audit-tool preparation. Seven responses arrived and six stages published before scope output-schema refusal; the overall result remains invalid/incomplete. One bound financial child is retained for independent numerical inspection. The initial inspector's exception-shape limitation is preserved, and separate partial-audit tools are being prepared. Neither a favorable earlier decision nor the presence of a calculation supplies the missing final review. No automatic retry or budget relaxation follows.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

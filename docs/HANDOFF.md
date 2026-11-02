@@ -2,7 +2,19 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
-## Current integration checkpoint
+## Current third-attempt checkpoint — do not rerun
+
+Current branch feat/context-workflow-evidence; PR9 is merged, product source remains frozen. Request runtime/d008/operational-request-v3.json is CONSUMED. Receipt runtime/d008/operational-outcome-v3.json: submission e2cbb488b0d3463782d85f3e8577a7c2, artifact804bdf3bc199159436bd46ec17dc16ce52d4264285660bde18e8f1aae92069ae. Outcome invalid/broker_stage_refused; seven authorized/observed responses, six published stages; scope job failed. Review_outcome=incomplete. One parent-bound financial child observed; financial values/outcome truth never printed. No retry/resume or fourth request is authorized as a blind repeat.
+
+Root local fixed-output diagnostics preserve scope JSON parse success and packet_code_refused: decision outside scope vocabulary and predicate outside allowed set; other checked role/alias/finding fields pass. Raw model reply/rationale remain private. One initial read-only metadata probe named nonexistent research_dispatch_observations and failed; corrected to supported queries. This inspector setup error is separate from the actual scope failure.
+
+The pinned new inspect-context-trace.py ran once on this receipt and failed its normal-record assumption (missing exception-record configuration/code fields), after five preliminary checks. Preserve runtime/d008/context-trace-inspection-v3.json, digest1b5a099aefcacbbeceb9062a76372c2dbcd1352e7d9bb0b1a213fa51c9947e77. No role, current-context or financial audit was reached. Critic owns NEW inspect-partial-context-trace.py and D008-context-operational-critic.md; authorized to test fixtures then run its safe read-only projection once on the actual receipt. Quality owns NEW verify-partial-workflow-v4.py and D008-partial-verifier-review.md; fixture/code review first, no actual data access until root reviews and explicitly launches. The v3 numerical verifier has NOT run on this actual partial trace. Do not edit old scripts or product source before exact actual evidence is verified.
+
+Root accounting in partial-accounting-v3.json:6 settled requests/$0.099999,1 uncertain/$0.080217 full hold; purpose allocations$1.730986. Global November2 committed$0.206834, remaining$19.793166,13 settled/1 uncertain/0 reserved. Prior-day CLI holds unchanged. Purpose total after all three attempts is$2.102888 of4, leaving$1.897112, less than the unchanged$2.625 whole-run planning ceiling. Do not recycle allocations or release the uncertain hold to fit another run. These limits do not block independent local implementation/review. Journal verified487events, head106a1ae39c6971ba95912df410f61d3ba38b928db03d69e118aa73c69d00e90b; recheck runtime later.
+
+Separate scope audit D008-context-operational-scope.md is preparing with root observations explicitly attributed until independent audits finish. Update current dashboard from actual lifecycle; the earlier two stopped attempts remain unchanged. Full goal, persistent R14, protected evaluation, scheduler/restore, paper and separately gated live readiness stay incomplete.
+
+## Earlier integration/preparation checkpoint
 
 PR9 merged as3b2ac39ff3c793b542e7e46b57ee2224178f1c51 after Checks41421353235 passed on exact head22c5b46544b58f4b3e27eb23c55a3e641692dfe8. Current branch is feat/context-workflow-evidence. The following validation checkpoint records its pre-merge review state; the final critic, quality and scope reports are integrated. Quality reports1256 tests+12 subtests in both source and clean installation; all reviewed implementation hashes remain unchanged.
 

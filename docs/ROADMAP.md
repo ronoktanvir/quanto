@@ -12,7 +12,7 @@ US markets come first, followed by crypto. The bounded private Alpaca acquisitio
 
 Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Use the owner-requested local Claude Code login for actual Fable and Opus council criticism, with bounded sanitized packets and recorded model outcomes. Earlier direct API reviews remain historical evidence; website chats are separate.
 
-D008 now supplies local issued assignments, fenced stage transitions, exact handoffs and bounded failure retrieval. Next implement the deterministic typed tool broker, transmission gate and bounded model transport, then observe a real five-role historical development workflow. State-machine fixtures do not close that requirement. Keep research scheduling/restore and protected evaluation as separate acceptance stages.
+D008 now supplies local issued assignments, fenced stage transitions, exact handoffs and bounded failure retrieval, plus a one-shot typed broker with strict transmission schemas, atomic shared spending authorization and a model-selected derivative calculation. Separate criticism, quality and scope reviews accept this bounded synthetic implementation. Next observe a real historical development workflow and independently review its exact trace. Synthetic fixtures and method-only model judgments do not close R14. Keep persistent research scheduling/restore and protected evaluation as separate acceptance stages.
 
 ## Controlled evaluation and operation
 

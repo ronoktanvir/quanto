@@ -2,7 +2,21 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
-## D008 foundation checkpoint — start here
+## D008 broker checkpoint — start here
+
+Current branch `feat/research-broker`, base `fc1c8c4e3c5f8dd37c77617f6a121d2ed42f57af`. Source/tests are frozen and independently reviewed; Git is authoritative for later commits. The previous foundation checkpoint below is historical and does not describe current broker integration.
+
+New modules: research_broker.py, research_packets.py, research_dispatch.py and research_comparison.py; provider.py, research_workflow.py and CLI have additive integration changes. `run-research --request PATH` is one explicit paid development workflow, not a scheduler or council command. Read RESEARCH_WORKFLOW.md before use. The director/hypothesis/engineer select and execute an allowed falsification predicate over a newly registered complete D007 suite; all frozen financial inputs stay unchanged. Models receive method-only packets and never receive values or predicate truth. Default five Haiku/two Opus mapping needs USD2.625 planning headroom; every send also requires atomic role/purpose/global allowances. No automatic paid retry or resume.
+
+Independent critic report `D008-broker-critic.md` SHA`24ef2ad67a2a59eb2827b649fc2275ddf3aa5564a71d3f67d192e97336f43f97` closes stale final guard, crossed-day allowance accounting and parent-effect lineage findings. Final broker SHA`ad8fe8f46103c85fdf77dd4ade94449f504d449ed5e01d580934312d6b8bd6b4`; dispatcher SHA`120834deb63abebeeb54a14f8cf470ad43fd9ac1f44979ee96fe9c88ba20c1f1`; comparison SHA`c2e933841f1664b62528b4342b37a34e7b3452e7783d91f495f78a6b05d65446`. The report lists all source/test identities. Pinned financial core remains unchanged.
+
+Separate quality report `D008-broker-quality.md` SHA`ed161279cdf9574ef61739a554d81762001ef8eef24eaaaab6fc91b07c2db35d` records1087 tests plus12 subtests in source Python3.13.12 and clean noneditable Python3.11.9, lint and independent full-workflow/arithmetic/privacy/budget/interruption/cancellation probes. All are synthetic/invented evidence. Separate D008-broker-scope.md accepts this bounded increment; Git integration is the next gate. Implementation commits are2b0a1e4,7381187,6d278f0; exact code bytes match the reviews. No actual D008 model workflow, new historical suite, protected reservation or acquisition has run. R14 remains incomplete.
+
+Then prepare an actual historical development workflow using the saved D007 suite and exact authorized refusal IDs below, only when the current-day budget fits and independent implementation integration is complete. Keep uncertain prior-day CLI holds; never settle them from estimates. Do not rerun previous council or historical runner scripts. Review the exact actual trace and independently check the new calculation before claiming even bounded acceptance. The broker always reports operational_acceptance=False; a method-only model quality statement cannot replace executed quality checks. Persistent scheduling/recovery, protected evaluation and later paper/live work remain required.
+
+At07:51UTC the website was ready; actual snapshot success07:48:00UTC, next07:53:00UTC. Runtime endpoints remain authoritative. The user briefly requested a travel checkpoint and then explicitly said continue; the full goal is active.
+
+## D008 foundation checkpoint — historical
 
 Current branch `feat/research-broker`; D008 proposal commit `2f59f10`, accepted council dispositions `e0f46d5`, implementation `fed57cf`, independent evidence `4359757`. PR5 merged as `814f39d00df9d8b8b87bc194ec8b40696618dc58` after Checks41400323465 passed on exact head4359757f76e881e37915b7a9c10fb0f69639e429. Main was fast-forwarded before the new branch. Git is authoritative for later checkpoints. The full goal remains active.
 

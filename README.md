@@ -69,10 +69,11 @@ new invocation. See [policy revisions](docs/POLICY_REVISIONS.md) and
 [study suites](docs/STUDY_SUITES.md). These controls and the bounded actual historical pilot passed separate criticism,
 quality and scope review. They do not establish a trading edge.
 
-D008 adds a [development role-state and failure-memory foundation](docs/RESEARCH_WORKFLOW.md).
-Issued identities, fenced handoffs and bounded retrieval are local libraries;
-operational model dispatch, the actual five-role historical workflow and protected
-evaluation still require integration and independent acceptance.
+D008 adds a [bounded development workflow](docs/RESEARCH_WORKFLOW.md): issued roles,
+authorized failure retrieval, strict model packets, shared spending controls and a
+model-selected registered calculation. Synthetic integration has been independently
+reviewed. Actual historical model operation and its trace review remain pending;
+protected evaluation and unattended research are separate unfinished stages.
 
 ## Conversations and costs
 

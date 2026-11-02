@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Quanto local research desk")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Project/runtime root")
     sub = parser.add_subparsers(dest="command", required=True)
-    server = sub.add_parser("serve", help="Open a read-only localhost dashboard")
+    server = sub.add_parser("serve", help="Open the local operator dashboard")
     server.add_argument("--port", type=int, default=8765)
     sub.add_parser("demo", help="Run a synthetic engineering fixture and record evidence")
     sub.add_parser("status", help="Inspect persisted research and budget records")

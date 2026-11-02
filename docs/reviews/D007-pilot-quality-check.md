@@ -8,9 +8,11 @@ The sanitized pilot record and inspected harness control flow support the lead's
 
 | Material | SHA-256 |
 | --- | --- |
-| `docs/reviews/D007-historical-pilot.md` | `de9cacf6caf47b4e3f7a7a4552d117319108a4af0968246fa04513e7df6e2fed` |
+| `docs/reviews/D007-historical-pilot.md` | `bc93ed4c8b16d5aea7b585e14a3be31c0705c428650e2cdf3cf60d4bc17f2ca4` |
 | `runtime/d007/verify-historical-pilot.py` (source only) | `68c08345ab6f5868a87960237fc76d2935e2dd59539815dc84930de6ec662d34` |
 | `runtime/d007/run-reviewed-suite.py` (source only) | `b17cb4f7520fa7a5fa2d1fb34fcfcb9861f3d8ce3d78709f68c01bd3f9831cf1` |
+
+Final documentation recheck: the sanitized pilot report was reread after the formatting corrections integrated in `4a3f323`. Its inspected hash above supersedes the earlier `de9cacf6caf47b4e3f7a7a4552d117319108a4af0968246fa04513e7df6e2fed`; counts, identities, claims and this bounded assessment remain unchanged. No tests, harness execution or private reads were needed for this recheck.
 
 The prior `docs/reviews/D007-quality.md` remains byte-identical at `f49673eb01b9add5bd079ca94c3a9296dd4614164928a39fa713a4518fe33646`. Its 808 tests plus 12 subtests in source and clean installed environments, lint results and independently written synthetic probes are separate earlier evidence. This check did not rerun those checks or expand their claims to investment performance.
 

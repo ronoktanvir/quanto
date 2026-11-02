@@ -1,8 +1,8 @@
 """Registered development-only exploration over verified private artifacts.
 
 These controls apply to cooperating callers, not a database or filesystem owner.
-Historical data remains inspection-only until calendar, action, information-time
-and usage admission is implemented. No result is a protected holdout or edge claim.
+Historical calculation requires separately verified conditional admission; the
+original dataset registration remains inspection-only. No result is a protected holdout or edge claim.
 """
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from quanto.ledger import LedgerError, canonical_json, hash_bytes, hash_json
 from quanto import research as research_engine
+from quanto import event_engine
+from quanto.event_engine import run_event_backtest
 from quanto.provenance import Provenance, ProvenanceError
 from quanto.research import Bar, ResearchValidationError, StrategySpec, run_backtest
 
@@ -239,15 +241,21 @@ def _finish(store, submission_id, status, details, *, attempt=None, attempt_resu
             }, now)
 
 
-def _error(store, submission_id, status, code, *, attempt=None):
+def _error(store, submission_id, status, code, *, attempt=None, evidence=None):
     details = {"error_code": code, "result_kind": "no_result"}
-    if code == "historical_admission_not_implemented":
+    if evidence is not None:
+        details["evidence_kind"] = evidence
+    if code == "historical_admission_required":
         details["admission_status"] = "inspection_only"
         details["admission_gaps"] = HISTORICAL_ADMISSION_GAPS
     if attempt:
         details["attempt_id"] = attempt
-    _finish(store, submission_id, status, details, attempt=attempt,
-            attempt_result={"error_code": code})
+    try:
+        _finish(store, submission_id, status, details, attempt=attempt,
+                attempt_result={"error_code": code, **({"evidence_kind": evidence} if evidence else {})})
+    except (OSError, sqlite3.Error, ProvenanceError, LedgerError):
+        return {"submission_id": submission_id, "status": "pending", **details,
+                "error_code": "publication_interrupted"}
     return {"submission_id": submission_id, "status": status, **details}
 
 
@@ -378,17 +386,29 @@ def _dataset(store: Provenance, digest: str) -> dict:
 
 
 def _code_identity() -> dict:
+    from quanto import admission, alpaca_data, alpaca_actions
     directory = Path(__file__).resolve().parent
     lock = directory.parents[1] / "uv.lock"
     return {"sources": {name: hash_bytes((directory / name).read_bytes())
-                         for name in ("research.py", "explorer.py", "provenance.py", "ledger.py")},
+                         for name in ("research.py", "event_engine.py", "explorer.py", "admission.py",
+                                      "alpaca_data.py", "alpaca_actions.py", "provenance.py", "ledger.py")},
             "dependency_lock_sha256": hash_bytes(lock.read_bytes()) if lock.is_file() else None,
             "entrypoint_bytecode_sha256": _function_identity(run_backtest),
             "loaded_engine_code": _loaded_engine_code(),
+            "research_engine_globals": _engine_globals(research_engine),
+            "event_entrypoint_bytecode_sha256": _function_identity(run_event_backtest),
+            "loaded_event_engine_code": _loaded_engine_code(event_engine),
+            "event_engine_globals": _engine_globals(event_engine),
+            "loaded_admission_globals": _engine_globals(admission),
+            "loaded_bars_provider_globals": _engine_globals(alpaca_data),
+            "loaded_actions_provider_globals": _engine_globals(alpaca_actions),
+            "event_policy": event_engine.policy_identity(),
             "python": platform.python_version(), "implementation": platform.python_implementation()}
 
 
-def _function_identity(function: FunctionType) -> str:
+def _function_identity(function: FunctionType, _stack=()) -> str:
+    if id(function) in _stack:
+        raise ExplorationError("cyclic_loaded_function_default")
     def portable(code):
         return code.replace(co_filename="<module>", co_consts=tuple(
             portable(value) if isinstance(value, CodeType) else value for value in code.co_consts
@@ -398,24 +418,39 @@ def _function_identity(function: FunctionType) -> str:
     def default(value):
         if value is None or type(value) in (str, int, float, bool):
             return value
+        if isinstance(value, type):
+            return {"class": value.__module__ + "." + value.__qualname__}
+        if isinstance(value, FunctionType):
+            return {"function": _function_identity(value, (*_stack, id(function)))}
         if isinstance(value, (tuple, list)):
             return {"type": type(value).__name__, "items": [default(item) for item in value]}
+        if isinstance(value, (set, frozenset)):
+            return {"type": type(value).__name__,
+                    "items": sorted((default(item) for item in value), key=canonical_json)}
         if isinstance(value, dict) and all(isinstance(key, str) for key in value):
             return {"type": "dict", "items": {key: default(item) for key, item in value.items()}}
         raise ExplorationError("unsupported_loaded_function_default")
 
+    closure = {}
+    for name, cell in zip(function.__code__.co_freevars, function.__closure__ or ()):
+        try:
+            contents = cell.cell_contents
+        except ValueError:
+            raise ExplorationError("empty_loaded_function_closure") from None
+        closure[name] = default(contents)
     return hash_json({
         "code_sha256": hash_bytes(marshal.dumps(portable(function.__code__), 2)),
         "defaults": default(function.__defaults__),
         "keyword_defaults": default(function.__kwdefaults__),
+        "closure": closure,
     })
 
 
-def _loaded_engine_code() -> dict:
+def _loaded_engine_code(module=research_engine) -> dict:
     """Fingerprint loaded helpers too: disk files may change after module import."""
     result = {}
-    for name, value in sorted(vars(research_engine).items()):
-        if getattr(value, "__module__", None) != research_engine.__name__:
+    for name, value in sorted(vars(module).items()):
+        if getattr(value, "__module__", None) != module.__name__:
             continue
         if isinstance(value, FunctionType):
             result[name] = _function_identity(value)
@@ -433,6 +468,39 @@ def _loaded_engine_code() -> dict:
     return result
 
 
+
+def _engine_globals(module) -> dict:
+    """Bind mutable policy globals and imported Quanto helpers used by the engine."""
+    from decimal import Decimal, Context
+    from fractions import Fraction
+
+    def encode(value):
+        if value is None or type(value) in (str, int, float, bool):
+            return value
+        if isinstance(value, bytes):
+            return {"bytes_sha256": hash_bytes(value)}
+        if isinstance(value, (Decimal, Fraction)):
+            return {"type": type(value).__name__, "value": str(value)}
+        if isinstance(value, re.Pattern):
+            return {"pattern": encode(value.pattern), "flags": value.flags}
+        if isinstance(value, Context):
+            return {"context": str(value)}
+        if isinstance(value, (list, tuple, set, frozenset)):
+            items = [encode(item) for item in value]
+            if isinstance(value, (set, frozenset)):
+                items.sort(key=canonical_json)
+            return {"type": type(value).__name__, "items": items}
+        if isinstance(value, dict) and all(isinstance(key, str) for key in value):
+            return {key: encode(item) for key, item in value.items()}
+        if isinstance(value, FunctionType):
+            return {"function": _function_identity(value)}
+        if isinstance(value, type):
+            return {"class": value.__module__ + "." + value.__qualname__}
+        return {"binding_type": type(value).__module__ + "." + type(value).__qualname__}
+
+    return {name: encode(value) for name, value in sorted(vars(module).items())
+            if not name.startswith("__")}
+
 def _counts(store: Provenance, market: dict) -> dict:
     row = store.journal.connection.execute(
         "SELECT COUNT(DISTINCT fingerprint), COUNT(*) FROM explorer_executions WHERE market_key=?",
@@ -444,20 +512,22 @@ def _counts(store: Provenance, market: dict) -> dict:
 def run_submission(root: Path, request: dict | str) -> dict:
     """Record an exploratory request before parsing/specification construction.
 
-    Exactly these fields are accepted: dataset_sha256, study_name, evaluation_start,
-    evaluation_end, specification. All loaded dataset coverage is development-only.
+    Fields are dataset_sha256, study_name, evaluation_start, evaluation_end,
+    specification, with admission_sha256 required for historical data. All loaded dataset coverage is development-only.
     Malformed bounded JSON is retained by hash. Unbounded/unencodable API envelopes
     fail the provenance preflight boundary before a submission can be recorded.
     """
+    from quanto.admission import AdmissionError
     with Provenance(root) as store:
         _schema(store)
         frozen_request = _envelope(request)
         submission = store.begin("exploratory_study", frozen_request)
-        attempt, publishing = None, False
+        attempt, publishing, evidence = None, False, None
         try:
             data = _request(frozen_request)
-            if set(data) != {"dataset_sha256", "study_name", "evaluation_start",
-                             "evaluation_end", "specification"}:
+            required = {"dataset_sha256", "study_name", "evaluation_start",
+                        "evaluation_end", "specification"}
+            if not required <= set(data) or set(data) - (required | {"admission_sha256"}):
                 raise ExplorationError("invalid_study_fields")
             study = _text(data["study_name"])
             digest = _ref(data["dataset_sha256"])
@@ -468,9 +538,17 @@ def run_submission(root: Path, request: dict | str) -> dict:
                     store, submission, digest, market, manifest["exposure_start"],
                     manifest["exposure_end"], study, "exploratory_access",
                 )
-            if (manifest["evidence_kind"] != "synthetic_fixture"
-                    or manifest["admission_status"] != "synthetic_only"):
-                raise ExplorationError("historical_admission_not_implemented")
+            evidence = manifest["evidence_kind"]
+            admission = None
+            if evidence == "historical_market_data":
+                if "admission_sha256" not in data:
+                    raise ExplorationError("historical_admission_required")
+                from quanto.admission import validate_admission
+                admission = validate_admission(store, _ref(data["admission_sha256"]), digest)
+            elif evidence != "synthetic_fixture" or manifest["admission_status"] != "synthetic_only":
+                raise ExplorationError("unsupported_evidence_kind")
+            elif "admission_sha256" in data:
+                raise ExplorationError("synthetic_admission_not_applicable")
             # Re-read both source and normalized objects: identity strings alone
             # cannot certify that the exact bytes still exist or are unchanged.
             store.read_bytes(_ref(manifest["source_sha256"]))
@@ -498,10 +576,16 @@ def run_submission(root: Path, request: dict | str) -> dict:
             frozen = {"strategy": asdict(specification), "evaluation_start": start.isoformat(),
                       "evaluation_end": end.isoformat(), "initial_position": "cash",
                       "benchmark": "buy_and_hold_same_window_same_costs", "purpose": "exploratory"}
+            identities = {"dataset_sha256": digest, "bars_sha256": manifest["bars_sha256"],
+                          "source_sha256": manifest["source_sha256"], "market": market}
+            if admission is not None:
+                identities.update(admission_sha256=data["admission_sha256"],
+                                  actions_sha256=hash_json(admission["actions"]),
+                                  admission_dependencies=admission["artifact_refs"])
+                frozen.update(admission_scope=admission["scope"], numerical_policy=event_engine.policy_identity())
             fingerprint = store.journal.register_experiment(
-                frozen, {"dataset_sha256": digest, "bars_sha256": manifest["bars_sha256"],
-                         "source_sha256": manifest["source_sha256"], "market": market},
-                code, "synthetic_fixture", assumptions={"development_policy": "entire_dataset_development_only"},
+                frozen, identities, code, evidence,
+                assumptions={"development_policy": "entire_dataset_development_only"},
             )
             attempt = store.journal.start_attempt(fingerprint)
             with store.journal._transaction():
@@ -510,39 +594,51 @@ def run_submission(root: Path, request: dict | str) -> dict:
                 store.journal._event("explorer_execution_registered", {
                     "submission_id": submission, "attempt_id": attempt, "fingerprint": fingerprint,
                 }, store.journal._now())
-            report = run_backtest(selected, specification, expected_session_dates=expected,
-                                  evidence_kind="synthetic_fixture", price_basis=manifest["price_basis"])
+            if admission is not None:
+                report = run_event_backtest(selected, specification, corporate_action_events=admission["actions"],
+                                           expected_session_dates=expected, evidence_kind=evidence,
+                                           price_basis=manifest["price_basis"])
+                validate_admission(store, data["admission_sha256"], digest)
+            else:
+                report = run_backtest(selected, specification, expected_session_dates=expected,
+                                      evidence_kind=evidence, price_basis=manifest["price_basis"]).to_dict()
             if _code_identity() != code:
                 raise ExplorationError("code_changed_during_execution")
             publishing = True
             artifact = store.put_json({
-                "schema_version": 1, "result_kind": "exploratory_result", "evidence_kind": "synthetic_fixture",
+                "schema_version": 1, "result_kind": "exploratory_result", "evidence_kind": evidence,
                 "investment_evidence": False, "dataset_sha256": digest, "frozen_request": frozen,
                 "code_identity": code, "development_policy": "entire_dataset_development_only",
-                "prior_exposure": "unknown_outside_application", "engine_report": report.to_dict(),
+                "prior_exposure": "unknown_outside_application", "engine_report": report,
+                "admission_sha256": data.get("admission_sha256"),
+                "admission_limitations": admission["limitations"] if admission else [],
             })
             counts = _counts(store, market)
             details = {"result_kind": "exploratory_result", "artifact_sha256": artifact,
                        "dataset_sha256": digest, "fingerprint": fingerprint, "attempt_id": attempt,
-                       "evidence_kind": "synthetic_fixture", "investment_evidence": False,
+                       "evidence_kind": evidence, "investment_evidence": False,
                        "prior_recorded_overlap_count": prior, **counts,
-                       "artifact_refs": sorted({artifact, digest, manifest["bars_sha256"], manifest["source_sha256"]})}
+                       "artifact_refs": sorted({artifact, digest, manifest["bars_sha256"], manifest["source_sha256"]}
+                                               | ({data["admission_sha256"], *admission["artifact_refs"]} if admission else set()))}
+            if admission is not None:
+                details["admission_sha256"] = data["admission_sha256"]
             _finish(store, submission, "success", details, attempt=attempt,
-                    attempt_result={"artifact_sha256": artifact, "evidence_kind": "synthetic_fixture"})
+                    attempt_result={"artifact_sha256": artifact, "evidence_kind": evidence,
+                                    "admission_sha256": data.get("admission_sha256")})
             return {"submission_id": submission, "status": "success", **details}
-        except ExplorationError as exc:
-            return _error(store, submission, "invalid", str(exc), attempt=attempt)
+        except (ExplorationError, AdmissionError) as exc:
+            return _error(store, submission, "invalid", str(exc), attempt=attempt, evidence=evidence)
         except (OSError, sqlite3.Error):
             return _error(store, submission, "interrupted",
-                          "publication_interrupted" if publishing else "storage_interrupted", attempt=attempt)
+                          "publication_interrupted" if publishing else "storage_interrupted", attempt=attempt, evidence=evidence)
         except (ProvenanceError, LedgerError):
             return _error(store, submission, "interrupted" if publishing else "invalid",
                           "publication_interrupted" if publishing else "artifact_or_storage_unavailable",
-                          attempt=attempt)
+                          attempt=attempt, evidence=evidence)
         except ResearchValidationError:
-            return _error(store, submission, "invalid", "engine_rejected_input", attempt=attempt)
+            return _error(store, submission, "invalid", "engine_rejected_input", attempt=attempt, evidence=evidence)
         except Exception:
-            return _error(store, submission, "failed", "execution_failed", attempt=attempt)
+            return _error(store, submission, "failed", "execution_failed", attempt=attempt, evidence=evidence)
 
 
 def list_exposures(root: Path, market: dict, start: str, end: str, *, limit: int = 100) -> list[dict]:

@@ -91,7 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     for name, description in (
         ("acquire-bars", "Acquire private historical Alpaca bars for data inspection"),
         ("acquire-calendar", "Acquire the paper-account session calendar"),
+        ("acquire-actions", "Acquire private corporate-action observations for inspection"),
         ("register-dataset", "Register exact dataset bytes and their declared scope"),
+        ("admit-dataset", "Check evidence for retrospective historical development research"),
         ("explore", "Record and execute an eligible exploratory study"),
     ):
         command = sub.add_parser(name, help=description)
@@ -115,11 +117,18 @@ def main(argv: list[str] | None = None) -> int:
             from quanto.critic import request_review
             output = request_review(root, args.packet.read_text())
             output = {key: value for key, value in output.items() if key != "text"}
-        elif args.command in {"acquire-bars", "acquire-calendar", "register-dataset", "explore"}:
+        elif args.command in {"acquire-bars", "acquire-calendar", "acquire-actions",
+                              "register-dataset", "admit-dataset", "explore"}:
             request = _request_text(args.request)
             if args.command in {"acquire-bars", "acquire-calendar"}:
                 from quanto.alpaca_data import acquire_bars, acquire_calendar
                 action = acquire_bars if args.command == "acquire-bars" else acquire_calendar
+            elif args.command == "acquire-actions":
+                from quanto.alpaca_actions import acquire_actions
+                action = acquire_actions
+            elif args.command == "admit-dataset":
+                from quanto.admission import admit_dataset
+                action = admit_dataset
             else:
                 from quanto.explorer import register_dataset, run_submission
                 action = register_dataset if args.command == "register-dataset" else run_submission

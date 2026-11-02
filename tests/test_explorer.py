@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import datetime, timedelta
 import json
+from pathlib import Path
 import sqlite3
 from zoneinfo import ZoneInfo
 
@@ -218,7 +219,7 @@ def test_historical_data_is_explicitly_inspection_only_and_full_request_range_ex
     monkeypatch.setattr(explorer, "run_backtest", lambda *args, **kwargs: pytest.fail("must not run"))
     denied = run_submission(tmp_path, request(result["manifest_sha256"]))
     assert denied["status"] == "invalid"
-    assert denied["error_code"] == "historical_admission_not_implemented"
+    assert denied["error_code"] == "historical_admission_required"
     assert "corporate_action_accounting" in denied["admission_gaps"]
     market = {**MARKET, "instrument_id": "us:EXAMPLE"}
     records = list_exposures(tmp_path, market, "2024-03-30", "2024-03-31")
@@ -258,8 +259,11 @@ def test_unregistered_manifest_and_unknown_admission_cannot_bypass_gate(tmp_path
 
 
 def test_compute_failure_has_registered_attempt_and_terminal_failure(tmp_path, dataset, monkeypatch):
+    # Inject supported, fully fingerprinted closure state; Path objects are not
+    # accepted as opaque values by the loaded-function identity boundary.
+    root = str(tmp_path)
     def failure(*args, **kwargs):
-        with Provenance(tmp_path) as store:
+        with Provenance(Path(root)) as store:
             assert store.journal.connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
             assert store.journal.connection.execute("SELECT COUNT(*) FROM experiments").fetchone()[0] == 1
         raise RuntimeError("secret exception must not be persisted")
@@ -391,7 +395,7 @@ def test_loaded_helper_defaults_are_part_of_execution_identity(monkeypatch):
     assert before["loaded_engine_code"]["_number"] != after["loaded_engine_code"]["_number"]
 
 
-def test_persistent_terminal_storage_failure_propagates_and_leaves_pending(tmp_path, dataset, monkeypatch):
+def test_persistent_terminal_storage_failure_returns_safe_pending(tmp_path, dataset, monkeypatch):
     from quanto.ledger import Journal
     original = Journal._event
 
@@ -401,9 +405,47 @@ def test_persistent_terminal_storage_failure_propagates_and_leaves_pending(tmp_p
         return original(journal, kind, payload, now)
 
     monkeypatch.setattr(Journal, "_event", failed_event)
-    with pytest.raises(OSError, match="fixture persistent storage failure"):
-        run_submission(tmp_path, request(dataset))
+    outcome = run_submission(tmp_path, request(dataset))
+    assert outcome["status"] == "pending"
+    assert outcome["error_code"] == "publication_interrupted"
     with Provenance(tmp_path) as store:
         assert store.list_submissions(kind="exploratory_study")[0]["status"] == "pending"
         assert store.journal.connection.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 0
         assert store.journal.verify_events()["count"] > 0
+
+
+def test_loaded_helper_closure_values_change_execution_identity(monkeypatch):
+    def target(value):
+        return lambda prices, spec, holding: value
+
+    monkeypatch.setattr(explorer.event_engine, "_target", target(True))
+    before = explorer._code_identity()
+    monkeypatch.setattr(explorer.event_engine, "_target", target(False))
+    after = explorer._code_identity()
+    assert before["sources"] == after["sources"]
+    assert before["event_engine_globals"]["_target"] != after["event_engine_globals"]["_target"]
+
+
+def test_unsupported_closure_state_refuses_identity():
+    def target(value):
+        return lambda: value
+
+    with pytest.raises(explorer.ExplorationError, match="unsupported_loaded_function_default"):
+        explorer._function_identity(target(object()))
+
+
+def test_cyclic_and_empty_closures_refuse_identity():
+    def recursive():
+        return recursive
+
+    with pytest.raises(explorer.ExplorationError, match="cyclic_loaded_function_default"):
+        explorer._function_identity(recursive)
+
+    value = True
+
+    def empty():
+        return value
+
+    del empty.__closure__[0].cell_contents
+    with pytest.raises(explorer.ExplorationError, match="empty_loaded_function_closure"):
+        explorer._function_identity(empty)

@@ -10,7 +10,7 @@ US markets come first, followed by crypto. The bounded private Alpaca acquisitio
 
 ## Persistent agent desk
 
-Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Continue genuine Opus criticism under the existing shared budget controls; the account is configured and actual reviews have completed.
+Implement research director, hypothesis researcher, experiment engineer, data/implementation critic, and statistical/portfolio critic. Persist exact evidence, prompts/model metadata, decisions, trials, and failures. Independently inspect each integrated increment through criticism, quality, and scope reviewers. Use the owner-requested local Claude Code login for actual Fable and Opus council criticism, with bounded sanitized packets and recorded model outcomes. Earlier direct API reviews remain historical evidence; website chats are separate.
 
 ## Controlled evaluation and operation
 

@@ -12,6 +12,7 @@ The original inspiration is QuantGPT: market history, deterministic backtests, m
 - No new subscriptions or paid hosting/data purchases.
 - Existing outside-model API account use is permitted up to USD 20 per day; use America/Los_Angeles calendar days and a shared reservation ledger.
 - Exact Claude Opus 5.5 is requested for outside-model criticism when available. Official model ID verified: claude-opus-5-5. Do not silently substitute.
+- Latest council route: Fable and Opus through the existing Claude Code terminal login, not direct API calls. Claude Code 2.1.316 is installed and reports authenticated first-party OAuth; actual one-turn council reviews completed for both exact models and are archived under D006-fable-cli and D006-opus-cli. API-backed website conversations remain separate. No new subscription or credit purchase is authorized.
 - Five independent perspectives on substantive decisions; bounded lower-level tasks may use smaller models.
 - Distinct criticism, quality validation, and no-drift oversight.
 - GitHub repository initially private, healthy commits and PR practice, prepared for possible future public release.
@@ -23,7 +24,7 @@ The original inspiration is QuantGPT: market history, deterministic backtests, m
 
 The operator requested a Google DeepMind-inspired local interface, distinct agent icons, planned/active/completed work, conversations about each role, a larger desk helper, and continuous website supervision. Role chats use new contextual Haiku assistants; the desk helper uses Opus. Original worker inquiries use a separate durable inbox and only actual worker responses may be recorded. Assistants have no tools or trading authority. The local service runs while this Mac is awake and signed in.
 
-The Anthropic credential is configured in the ignored local .env. Three actual Opus architecture reviews were received; D005's completed review cost $0.197620. Project-wide accounting was $0.562722 after that review, including earlier chat/incident checks; the runtime ledger is authoritative for later usage. Both requested model IDs were confirmed by the provider model listing. The starting-environment section below is historical.
+The Anthropic credential is configured in the ignored local .env. Five actual Opus architecture responses have been received: three complete and two truncated. D006's broad incomplete response and completed focused critique together cost $0.415132. Project-wide accounting was $0.977854 after those reviews, including earlier chat/incident checks; the runtime ledger is authoritative for later usage. The later CLI pair reported list-price estimates of$1.152220 for Fable and$0.451604 for Opus; these are not reconciled subscription charges. Their conservative holds remain recorded. Both requested model identities were observed in the completed CLI results. The starting-environment section below is historical.
 
 ## Verified starting environment
 

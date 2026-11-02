@@ -37,7 +37,7 @@ PYTHONPATH=src .venv/bin/python -m quanto acquire-calendar --request examples/re
 PYTHONPATH=src .venv/bin/python -m quanto submissions --limit 20
 ```
 
-The helper preserves existing settings and writes `.env` with owner-only permissions. The adapter allows only specific historical-data and calendar reads. Downloaded data remains inspection-only: corporate actions, information timing and other admission requirements still prevent historical backtesting. Each deliberate acquisition is a new recorded attempt; no automatic retry or feed substitution occurs. See [Data sources](docs/DATA_SOURCES.md) for coverage and rights limitations.
+The helper preserves existing settings and writes `.env` with owner-only permissions. The adapter allows only specific historical-data, calendar and corporate-action reads. Downloaded data remains inspection-only until the separate admission checks pass. The historical-accounting software passed independent review; the actual pilot remains refused under its current split-entitlement policy. Each deliberate acquisition is a new recorded attempt; no automatic retry or feed substitution occurs. See [Data sources](docs/DATA_SOURCES.md) for coverage and rights limitations.
 
 Run a separate synthetic example to compare two lookbacks over identical evaluation dates, repeat one candidate under another name, and retain a malformed request:
 
@@ -46,6 +46,20 @@ PYTHONPATH=src .venv/bin/python examples/synthetic_exploration.py --root /tmp/qu
 ```
 
 The example creates that directory and records all work there. It provides engineering evidence only. [Provenance](docs/PROVENANCE.md) explains artifact verification and retention; [Research protocol](docs/RESEARCH_PROTOCOL.md) explains development exposure, candidate counts and the remaining final-evaluation controls.
+
+The event-accounting increment passed independent software review. Its separate example
+uses invented prices to reconcile a two-for-one split and cash dividend:
+
+```sh
+PYTHONPATH=src .venv/bin/python examples/synthetic_actions.py
+```
+
+Both fixture portfolios finish with 20 shares at 50 and 10 cash, or 1,010 equity
+from 1,000 starting cash. This validates the example's arithmetic, not a trading
+strategy. [Accounting](docs/ACCOUNTING.md) records the numerical and payment
+policies. [Action sources](docs/ACTION_SOURCES.md) documents the new bounded
+`acquire-actions` command; `admit-dataset` checks preserved evidence before a
+historical study can run. Actual historical verification remains pending.
 
 ## Conversations and costs
 

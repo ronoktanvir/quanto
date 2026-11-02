@@ -29,7 +29,9 @@ def context():
     return {"schema_version": 1, "kind": "research_role_context", "role": "director",
             "objective": "frozen_suite_falsification", "evidence_kind": "synthetic_fixture",
             "access_class": "sanitized_development", "data_values_disclosed": False,
-            "method": "frozen_trailing_return_next_open_three_costs", "scope": "development_only",
+            "method": "frozen_next_open_three_cost_development_suite",
+            "suite_integrity": "verified_roster_and_current_specification",
+            "scope": "development_only",
             "allowed_predicates": sorted(PREDICATES), "artifact_aliases": ["artifact-1"],
             "failures": [], "prior_outputs": [], "execution_state": "not_requested"}
 

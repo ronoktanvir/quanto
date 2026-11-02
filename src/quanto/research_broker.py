@@ -19,7 +19,9 @@ from quanto.provenance import Provenance, ProvenanceError, _strict_json
 from quanto.provider import HAIKU, OPUS, _research_ready
 from quanto.research_comparison import completion_projection, run_comparison
 from quanto.research_dispatch import ResearchDispatcher
-from quanto.research_packets import FAILURE_CODES, PREDICATES, SYSTEM_PROMPT, validate_packet
+from quanto.research_packets import (
+    FAILURE_CODES, METHOD, PREDICATES, SUITE_INTEGRITY, SYSTEM_PROMPT, validate_packet,
+)
 from quanto.research_workflow import ROLES, REVIEW_ROLES, ResearchWorkflow
 
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -161,16 +163,59 @@ def _failure_projection(store, allowed):
     return facts, receipts
 
 
-def _context(role, evidence, aliases, failures, previous, execution):
+def _method_verification(store, configuration_sha256, role):
+    """Recheck exact local dependencies before asserting a packet integrity fact."""
+    from quanto.study_suite import _verified
+
+    configuration = store.read_json(configuration_sha256)
+    suite = _verified(store, configuration["suite_sha256"])
+    if suite["policy_revision_sha256"] != configuration["verified_policy_revision_sha256"]:
+        raise BrokerError("broker_suite_verification_changed")
+    return store.put_json({
+        "schema_version": 1, "kind": "research_suite_integrity_observation", "role": role,
+        "configuration_sha256": configuration_sha256,
+        "suite_sha256": configuration["suite_sha256"],
+        "policy_revision_sha256": suite["policy_revision_sha256"],
+        "verified_at": store.journal._stamp(store.journal._now()),
+        "method": METHOD, "suite_integrity": SUITE_INTEGRITY,
+    })
+
+
+def _context(role, evidence, aliases, failures, previous, execution, integrity):
     return validate_packet({
         "schema_version": 1, "kind": "research_role_context", "role": role,
         "objective": "frozen_suite_falsification", "evidence_kind": evidence,
         "access_class": "sanitized_development",
-        "method": "frozen_trailing_return_next_open_three_costs", "scope": "development_only",
+        "method": METHOD, "suite_integrity": integrity, "scope": "development_only",
         "data_values_disclosed": False, "allowed_predicates": sorted(PREDICATES),
         "artifact_aliases": sorted(aliases), "failures": failures,
         "prior_outputs": previous, "execution_state": execution,
     })
+
+
+def _bind_model_packet(workflow, parent, token, worker, fence, request_id,
+                       packet_sha256, verification_sha256):
+    """Retain the exact private integrity basis even if dispatch never returns."""
+    with workflow.journal._transaction():
+        assignment = workflow._leased(token, worker, fence, workflow.journal._now())
+        run = workflow.db.execute(
+            "SELECT * FROM research_broker_runs WHERE submission_id=?", (parent,)).fetchone()
+        proof = workflow.store.read_json(verification_sha256)
+        packet = validate_packet(workflow.store.read_json(packet_sha256))
+        if (run is None or run["workflow_run_id"] != assignment["run_id"]
+                or proof.get("kind") != "research_suite_integrity_observation"
+                or proof.get("configuration_sha256") != run["configuration_sha256"]
+                or proof.get("role") != assignment["role"] or packet["role"] != assignment["role"]
+                or proof.get("method") != packet["method"]
+                or proof.get("suite_integrity") != packet["suite_integrity"]):
+            raise BrokerError("broker_packet_verification_mismatch")
+        workflow._leased(token, worker, fence, workflow.journal._now())
+        workflow._event("broker_packet_bound", {
+            "parent_submission_id": parent, "assignment_id": assignment["assignment_id"],
+            "role": assignment["role"], "fence": fence, "request_id": request_id,
+            "configuration_sha256": run["configuration_sha256"],
+            "packet_sha256": packet_sha256, "verification_sha256": verification_sha256,
+        }, workflow.journal._now())
 
 
 def _finish(store, submission, status, record):
@@ -318,9 +363,18 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                     produced.append(facts_ref)
                 inputs = workflow.available_input_refs(token, worker, fence)
                 aliases = _aliases(store, workflow_id, inputs)
-                context = _context(role, config["evidence_kind"], aliases, facts, previous, execution)
+                # The exact evidence stays private. Only its fixed integrity category
+                # enters the packet; previous stage observations are never reused.
+                verification_ref = _method_verification(store, config_ref, role)
+                verification = store.read_json(verification_ref)
+                stage_private.append(verification_ref)
+                context = _context(role, config["evidence_kind"], aliases, facts, previous, execution,
+                                   verification["suite_integrity"])
                 context_ref = store.put_json(context)
-                call = dispatcher.dispatch(token, worker, fence, "research-" + uuid.uuid4().hex,
+                model_request_id = "research-" + uuid.uuid4().hex
+                _bind_model_packet(workflow, submission, token, worker, fence, model_request_id,
+                                   context_ref, verification_ref)
+                call = dispatcher.dispatch(token, worker, fence, model_request_id,
                                            context, transport=transport)
                 produced.extend(call["artifact_refs"])
                 projection = call["projection"]
@@ -366,6 +420,8 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                                    for item in projection["findings"]],
                     "next_action": "stop" if stop else "proceed"})
                 stage = {"role": role, "assignment_id": assignment["assignment_id"],
+                         "model_request_id": model_request_id,
+                         "method_verification_sha256": verification_ref,
                          "model_packet_sha256": context_ref, "alias_bindings": aliases,
                          "projection_sha256": projection_ref, "model_receipt": call["receipt"],
                          "handoff_sha256": handoff["handoff_sha256"],

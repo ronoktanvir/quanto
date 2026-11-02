@@ -92,12 +92,61 @@ def test_complete_real_composition_fresh_suite_and_no_private_context(tmp_path, 
         # Alias meanings remain stable as later roles receive more artifacts.
         aliases = {}
         for stage in result["stages"]:
+            observation = store.read_json(stage["method_verification_sha256"])
+            assert observation["suite_sha256"] == configuration["suite_sha256"]
+            assert observation["configuration_sha256"] == result["configuration_sha256"]
+            assert observation["role"] == stage["role"]
+            assert stage["method_verification_sha256"] in stage["private_tool_refs"]
+            assert stage["method_verification_sha256"] not in stage["alias_bindings"].values()
             for alias, digest in stage["alias_bindings"].items():
                 assert alias not in aliases or aliases[alias] == digest
                 aliases[alias] = digest
         private = store.journal.connection.execute("SELECT artifact_sha256 FROM research_private_responses").fetchall()
         assert len(private) == 7
         assert all("PRIVATE-RATIONALE" in store.read_json(row[0])["reply"] for row in private)
+
+
+def test_suite_lost_after_first_response_refuses_next_integrity_claim(tmp_path, configuration):
+    model = ModelFixture()
+
+    def lose_suite(body, key):
+        response = model(body, key)
+        with Provenance(tmp_path) as store:
+            store.tombstone(configuration["suite_sha256"], "operator_requested")
+        return response
+
+    result = run_workflow(tmp_path, configuration, transport=lose_suite)
+    assert result["status"] == "invalid"
+    assert len(model.contexts) == 1
+    assert result["dispatch_counts"] == {"authorized": 1, "response_observed": 1}
+    with Provenance(tmp_path) as store:
+        assert store.list_submissions(kind="research_comparison") == []
+        assert store.list_submissions(kind="study_suite_run") == []
+        assert len(result["stages"]) == 1
+
+
+def test_failed_response_keeps_exact_predispatch_integrity_binding(tmp_path, configuration):
+    result = run_workflow(tmp_path, configuration,
+                          transport=ModelFixture(malformed="director"))
+    assert result["status"] == "invalid" and result["stages"] == []
+    with Provenance(tmp_path) as store:
+        db = store.journal.connection
+        row = db.execute("SELECT * FROM events WHERE kind='workflow_broker_packet_bound'").fetchone()
+        binding = json.loads(row["payload"])
+        assert binding["parent_submission_id"] == result["submission_id"]
+        packet = store.read_json(binding["packet_sha256"])
+        proof = store.read_json(binding["verification_sha256"])
+        assert proof["role"] == packet["role"] == "director"
+        assert proof["configuration_sha256"] == binding["configuration_sha256"]
+        assert proof["suite_sha256"] == configuration["suite_sha256"]
+        receipt = db.execute("SELECT * FROM research_dispatch_holds WHERE request_id=?",
+                             (binding["request_id"],)).fetchone()
+        assert receipt["assignment_id"] == binding["assignment_id"]
+        start = db.execute("SELECT id FROM events WHERE kind='budget_reserved' "
+                           "AND json_extract(payload,'$.request_id')=?",
+                           (binding["request_id"],)).fetchone()[0]
+        assert row["id"] < start
+        assert store.journal.verify_events()["count"] > 0
 
 
 def test_material_model_choice_changes_registered_derivative(tmp_path, configuration):

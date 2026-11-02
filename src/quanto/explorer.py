@@ -386,12 +386,13 @@ def _dataset(store: Provenance, digest: str) -> dict:
 
 
 def _code_identity() -> dict:
-    from quanto import admission, alpaca_data, alpaca_actions
+    from quanto import admission, alpaca_data, alpaca_actions, policy_revision, study_suite
     directory = Path(__file__).resolve().parent
     lock = directory.parents[1] / "uv.lock"
     return {"sources": {name: hash_bytes((directory / name).read_bytes())
                          for name in ("research.py", "event_engine.py", "explorer.py", "admission.py",
-                                      "alpaca_data.py", "alpaca_actions.py", "provenance.py", "ledger.py")},
+                                      "alpaca_data.py", "alpaca_actions.py", "provenance.py", "ledger.py",
+                                      "policy_revision.py", "study_suite.py")},
             "dependency_lock_sha256": hash_bytes(lock.read_bytes()) if lock.is_file() else None,
             "entrypoint_bytecode_sha256": _function_identity(run_backtest),
             "loaded_engine_code": _loaded_engine_code(),
@@ -402,6 +403,8 @@ def _code_identity() -> dict:
             "loaded_admission_globals": _engine_globals(admission),
             "loaded_bars_provider_globals": _engine_globals(alpaca_data),
             "loaded_actions_provider_globals": _engine_globals(alpaca_actions),
+            "loaded_policy_revision_globals": _engine_globals(policy_revision),
+            "loaded_study_suite_globals": _engine_globals(study_suite),
             "event_policy": event_engine.policy_identity(),
             "python": platform.python_version(), "implementation": platform.python_implementation()}
 
@@ -509,15 +512,18 @@ def _counts(store: Provenance, market: dict) -> dict:
     return {"recorded_candidate_count": row[0], "recorded_execution_count": row[1]}
 
 
-def run_submission(root: Path, request: dict | str) -> dict:
+def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None = None) -> dict:
     """Record an exploratory request before parsing/specification construction.
 
     Fields are dataset_sha256, study_name, evaluation_start, evaluation_end,
-    specification, with admission_sha256 required for historical data. All loaded dataset coverage is development-only.
+    specification, with admission_sha256 required for historical data and a
+    registered suite_sha256 for D007 policy revisions. All loaded coverage is development-only.
     Malformed bounded JSON is retained by hash. Unbounded/unencodable API envelopes
     fail the provenance preflight boundary before a submission can be recorded.
     """
     from quanto.admission import AdmissionError
+    from quanto.policy_revision import PolicyRevisionError, validate_study
+    from quanto.study_suite import StudySuiteError, validate_membership, validate_launch
     with Provenance(root) as store:
         _schema(store)
         frozen_request = _envelope(request)
@@ -527,7 +533,7 @@ def run_submission(root: Path, request: dict | str) -> dict:
             data = _request(frozen_request)
             required = {"dataset_sha256", "study_name", "evaluation_start",
                         "evaluation_end", "specification"}
-            if not required <= set(data) or set(data) - (required | {"admission_sha256"}):
+            if not required <= set(data) or set(data) - (required | {"admission_sha256", "suite_sha256"}):
                 raise ExplorationError("invalid_study_fields")
             study = _text(data["study_name"])
             digest = _ref(data["dataset_sha256"])
@@ -540,15 +546,27 @@ def run_submission(root: Path, request: dict | str) -> dict:
                 )
             evidence = manifest["evidence_kind"]
             admission = None
+            suite = None
             if evidence == "historical_market_data":
                 if "admission_sha256" not in data:
                     raise ExplorationError("historical_admission_required")
                 from quanto.admission import validate_admission
                 admission = validate_admission(store, _ref(data["admission_sha256"]), digest)
+                if admission.get("policy_revision_sha256"):
+                    validate_study(store, admission["policy_revision"], data)
+                    if "suite_sha256" not in data:
+                        raise ExplorationError("registered_study_suite_required")
+                    suite = validate_membership(store, _ref(data["suite_sha256"]), data,
+                                                before_submission_id=submission)
+                    validate_launch(store, suite_run_id, data, submission, bind=True)
+                elif "suite_sha256" in data:
+                    raise ExplorationError("suite_policy_revision_required")
             elif evidence != "synthetic_fixture" or manifest["admission_status"] != "synthetic_only":
                 raise ExplorationError("unsupported_evidence_kind")
             elif "admission_sha256" in data:
                 raise ExplorationError("synthetic_admission_not_applicable")
+            elif "suite_sha256" in data:
+                raise ExplorationError("synthetic_suite_not_applicable")
             # Re-read both source and normalized objects: identity strings alone
             # cannot certify that the exact bytes still exist or are unchanged.
             store.read_bytes(_ref(manifest["source_sha256"]))
@@ -583,6 +601,10 @@ def run_submission(root: Path, request: dict | str) -> dict:
                                   actions_sha256=hash_json(admission["actions"]),
                                   admission_dependencies=admission["artifact_refs"])
                 frozen.update(admission_scope=admission["scope"], numerical_policy=event_engine.policy_identity())
+            if suite is not None:
+                identities.update(suite_sha256=data["suite_sha256"],
+                                  suite_dependencies=suite["artifact_refs"],
+                                  policy_revision_sha256=suite["policy_revision_sha256"])
             fingerprint = store.journal.register_experiment(
                 frozen, identities, code, evidence,
                 assumptions={"development_policy": "entire_dataset_development_only"},
@@ -598,7 +620,13 @@ def run_submission(root: Path, request: dict | str) -> dict:
                 report = run_event_backtest(selected, specification, corporate_action_events=admission["actions"],
                                            expected_session_dates=expected, evidence_kind=evidence,
                                            price_basis=manifest["price_basis"])
-                validate_admission(store, data["admission_sha256"], digest)
+                rechecked = validate_admission(store, data["admission_sha256"], digest)
+                if suite is not None:
+                    validate_study(store, rechecked["policy_revision"], data)
+                    if validate_membership(store, data["suite_sha256"], data,
+                                           before_submission_id=submission) != suite:
+                        raise ExplorationError("suite_dependencies_changed")
+                    validate_launch(store, suite_run_id, data, submission)
             else:
                 report = run_backtest(selected, specification, expected_session_dates=expected,
                                       evidence_kind=evidence, price_basis=manifest["price_basis"]).to_dict()
@@ -612,6 +640,8 @@ def run_submission(root: Path, request: dict | str) -> dict:
                 "prior_exposure": "unknown_outside_application", "engine_report": report,
                 "admission_sha256": data.get("admission_sha256"),
                 "admission_limitations": admission["limitations"] if admission else [],
+                "admission_evidence": admission,
+                "study_suite": suite,
             })
             counts = _counts(store, market)
             details = {"result_kind": "exploratory_result", "artifact_sha256": artifact,
@@ -619,14 +649,19 @@ def run_submission(root: Path, request: dict | str) -> dict:
                        "evidence_kind": evidence, "investment_evidence": False,
                        "prior_recorded_overlap_count": prior, **counts,
                        "artifact_refs": sorted({artifact, digest, manifest["bars_sha256"], manifest["source_sha256"]}
-                                               | ({data["admission_sha256"], *admission["artifact_refs"]} if admission else set()))}
+                                               | ({data["admission_sha256"], *admission["artifact_refs"]} if admission else set())
+                                               | ({data["suite_sha256"], *suite["artifact_refs"]} if suite else set()))}
             if admission is not None:
                 details["admission_sha256"] = data["admission_sha256"]
+            if suite is not None:
+                details.update(suite_sha256=data["suite_sha256"],
+                               suite_run_id=suite_run_id,
+                               policy_revision_sha256=suite["policy_revision_sha256"])
             _finish(store, submission, "success", details, attempt=attempt,
                     attempt_result={"artifact_sha256": artifact, "evidence_kind": evidence,
                                     "admission_sha256": data.get("admission_sha256")})
             return {"submission_id": submission, "status": "success", **details}
-        except (ExplorationError, AdmissionError) as exc:
+        except (ExplorationError, AdmissionError, PolicyRevisionError, StudySuiteError) as exc:
             return _error(store, submission, "invalid", str(exc), attempt=attempt, evidence=evidence)
         except (OSError, sqlite3.Error):
             return _error(store, submission, "interrupted",

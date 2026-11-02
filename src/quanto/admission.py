@@ -8,7 +8,9 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from fractions import Fraction
+import json
 from pathlib import Path
+import re
 import sqlite3
 from urllib.parse import urlsplit
 
@@ -17,11 +19,22 @@ from quanto import alpaca_actions as actions_provider
 from quanto.ledger import LedgerError, hash_bytes, hash_json
 from quanto.provenance import Provenance, ProvenanceError
 
-RULES = {"version": "D006-admission-v1.1", "scope": "conditional_retrospective_development",
+RULES = {"version": "D007-admission-v1", "scope": "conditional_retrospective_development",
          "relevance": "full_acquired_interval_ex_effective_and_associated_future_payables",
          "pre_window_cash_merger": "completed_acquirer_only_source_bound_v1",
          "unknown_relevance": "reject", "duplicates": "identical_same_id_only",
-         "price_basis": "raw", "currency": "USD", "all_categories": True}
+         "price_basis": "raw", "currency": "USD", "all_categories": True,
+         "regular_way_split": "domestic_integer_forward_split_v1"}
+SPLIT_LIMITATIONS = ["economic_packages_not_settled_inventory_or_broker_availability",
+                     "redemption_delivery_outcome_unverified",
+                     "published_schedule_not_emergency_closure_or_symbol_halt_certificate",
+                     "expected_scheduled_trading_not_observed_execution",
+                     "attributed_purchaser_entitlement_not_independent_market_observation"]
+DATE_FIELDS = {"process_date", "ex_date", "record_date", "payable_date",
+               "due_bill_redemption_date", "effective_date"}
+SOURCE_ROLES = {"issuer", "finra_11140", "finra_11630", "finra_notice_24_04", "provider_schema"}
+ATTRIBUTION_FIELDS = {"source_sha256", "locator", "judgment", "author", "observed_at",
+                      "classification", "supporting_sources"}
 LIMITATIONS = ["latest_retrieved_revision_not_point_in_time", "vendor_omissions_not_excluded",
                "process_envelope_not_certified_history_floor_or_lag_bound",
                "attributed_issuer_extraction_not_machine_proven", "account_and_exchange_terms_not_certified",
@@ -61,7 +74,9 @@ def _ref(value):
 
 
 def _decimal(value):
-    _need(isinstance(value, str) and 0 < len(value) <= 100, "invalid_action_rate")
+    _need(isinstance(value, str) and 0 < len(value) <= 100
+          and re.fullmatch(r"\+?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value),
+          "invalid_action_rate")
     try:
         result = Decimal(value)
         _need(result.is_finite() and result > 0 and abs(result.adjusted()) <= 100,
@@ -109,6 +124,321 @@ def _judgment(value, sources):
           "unbound_primary_judgment")
     _text(value.get("locator"))
     _text(value.get("judgment"))
+
+
+def _aware(value):
+    try:
+        stamp = datetime.fromisoformat(_text(value))
+        _need(stamp.utcoffset() is not None, "invalid_review_time")
+        return stamp
+    except (ValueError, TypeError):
+        raise AdmissionError("invalid_review_time") from None
+
+
+def _attributed(value, sources, *, fields=(), direct=False):
+    _need(isinstance(value, dict) and set(value) == ATTRIBUTION_FIELDS | set(fields),
+          "invalid_split_judgment")
+    _judgment(value, sources)
+    _text(value["author"])
+    _aware(value["observed_at"])
+    _need(value["classification"] in (("direct",) if direct else ("direct", "inferred")),
+          "invalid_judgment_classification")
+    support = value["supporting_sources"]
+    _need(isinstance(support, list) and len(support) <= 20, "invalid_supporting_sources")
+    refs = {value["source_sha256"]}
+    for item in support:
+        _need(isinstance(item, dict) and set(item) == {"source_sha256", "locator"}
+              and item["source_sha256"] in sources, "unbound_primary_judgment")
+        _text(item["locator"])
+        refs.add(item["source_sha256"])
+    return refs
+
+
+def _provider_dates(record):
+    """A present null is different from an absent key; never fill source dates."""
+    return {name: {"present": name in record, "value": record.get(name)}
+            for name in sorted(DATE_FIELDS | {key for key in record if key.endswith("_date")})}
+
+
+def _annotation_sources(annotation):
+    refs = set()
+    def visit(value):
+        if isinstance(value, dict):
+            if "source_sha256" in value:
+                refs.add(_ref(value["source_sha256"]))
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+    visit(annotation)
+    roles = annotation.get("source_roles", {})
+    _need(isinstance(roles, dict) and set(roles) == SOURCE_ROLES, "split_source_roles_required")
+    refs.update(_ref(value) for value in roles.values())
+    return refs
+
+
+def _annotation_authors(value):
+    authors = set()
+    if isinstance(value, dict):
+        if "author" in value:
+            authors.add(_text(value["author"]).strip().casefold())
+        for child in value.values():
+            authors.update(_annotation_authors(child))
+    elif isinstance(value, list):
+        for child in value:
+            authors.update(_annotation_authors(child))
+    return authors
+
+
+def _review_document(store, digest):
+    review = store.read_json(_ref(digest))
+    fields = {"schema_version", "kind", "annotation_sha256", "author", "reviewer", "reviewer_kind",
+              "reviewed_at", "verdict", "reviewed_sources", "reviewed_calendar_sha256", "report_sha256"}
+    _need(isinstance(review, dict) and set(review) == fields and review["schema_version"] == 1
+          and review["kind"] == "regular_way_split_semantic_review", "invalid_split_semantic_review")
+    annotation = store.read_json(_ref(review["annotation_sha256"]))
+    _need(hash_json(annotation) == review["annotation_sha256"], "noncanonical_annotation_identity")
+    _need(review["author"] == annotation.get("author")
+          and _text(review["reviewer"]).strip().casefold() not in _annotation_authors(annotation)
+          and review["reviewer_kind"] == "native_agent", "independent_split_reviewer_required")
+    _need(_aware(review["reviewed_at"]) >= _aware(annotation.get("observed_at")),
+          "semantic_review_precedes_annotation")
+    _need(review["verdict"] in ("accepted", "accepted_with_qualifications"), "split_review_not_accepted")
+    schedule = store.read_json(_ref(review["reviewed_calendar_sha256"]))
+    _need(_aware(review["reviewed_at"]) >= _aware(schedule["review"]["reviewed_at"]),
+          "semantic_review_precedes_calendar_review")
+    sources = _annotation_sources(annotation) | {_ref(schedule["source_sha256"])}
+    _need(review["reviewed_sources"] == sorted(sources), "semantic_review_sources_mismatch")
+    _need(bool(store.read_bytes(_ref(review["report_sha256"]))), "empty_semantic_review_report")
+    refs = {digest, review["annotation_sha256"], review["reviewed_calendar_sha256"],
+            review["report_sha256"], *sources}
+    for ref in refs:
+        _need(bool(store.read_bytes(ref)), "empty_primary_source")
+    return review, refs
+
+
+def _submission_event(store, submission, kind):
+    matches = []
+    for row in store.journal.connection.execute("SELECT id,payload FROM events WHERE kind=?", (kind,)):
+        value = json.loads(row["payload"])
+        if value.get("submission_id") == submission["submission_id"]:
+            if kind == "submission_started":
+                _need(all(value.get(key) == submission[key] for key in (
+                    "kind", "request_sha256", "request_bytes", "request_encoding")),
+                    "registration_event_mismatch")
+            else:
+                _need(value.get("status") == submission["status"]
+                      and value.get("details") == submission["details"], "registration_event_mismatch")
+            matches.append(row["id"])
+    _need(len(matches) == 1, "registration_event_mismatch")
+    return matches[0]
+
+
+def _registered_review(store, digest, *, before_submission_id=None):
+    review, refs = _review_document(store, digest)
+    store.journal.verify_events()
+    rows = store.journal.connection.execute(
+        "SELECT s.submission_id,o.details FROM provenance_submissions s JOIN provenance_outcomes o "
+        "USING(submission_id) WHERE s.kind='regular_way_split_semantic_review' AND o.status='success'")
+    found = []
+    before = (_submission_event(store, store.get_submission(before_submission_id), "submission_started")
+              if before_submission_id is not None else None)
+    for row in rows:
+        details = json.loads(row["details"])
+        if details.get("review_sha256") != digest:
+            continue
+        submission = store.get_submission(row["submission_id"])
+        started = _submission_event(store, submission, "submission_started")
+        finished = _submission_event(store, submission, "submission_finished")
+        _need(started < finished, "semantic_review_registration_order")
+        if before is not None and finished >= before:
+            continue
+        raw_ref = _ref(details.get("request_sha256"))
+        raw = store.read_bytes(raw_ref)
+        _need(hash_bytes(raw) == submission["request_sha256"] and len(raw) == submission["request_bytes"]
+              and store.read_json(raw_ref) == {"review_sha256": digest}, "semantic_review_registration_mismatch")
+        _need(refs | {raw_ref} <= set(details.get("artifact_refs", [])), "semantic_review_registration_mismatch")
+        for ref in details["artifact_refs"]:
+            store.read_bytes(_ref(ref))
+        found.append(set(details["artifact_refs"]))
+    _need(bool(found), "split_semantic_review_not_registered_before_admission")
+    return review, refs | set.union(*found)
+
+
+def register_split_semantic_review(root: Path, request: dict | str) -> dict:
+    """Register attributed independent review; this does not grant admission."""
+    from quanto.explorer import _envelope, _request, ExplorationError
+    with Provenance(root) as store:
+        frozen = _envelope(request)
+        submission = store.begin("regular_way_split_semantic_review", frozen)
+        publishing = False
+        try:
+            value = _request(frozen)
+            _need(set(value) == {"review_sha256"}, "invalid_semantic_review_registration")
+            review, refs = _review_document(store, _ref(value["review_sha256"]))
+            publishing = True
+            raw_ref = store.put_bytes(frozen.encode("utf-8"))
+            details = {"review_sha256": value["review_sha256"], "request_sha256": raw_ref,
+                       "annotation_sha256": review["annotation_sha256"],
+                       "artifact_refs": sorted(refs | {raw_ref})}
+            store.finish(submission, "success", details)
+            return {"submission_id": submission, "status": "success", **details}
+        except (AdmissionError, ExplorationError) as exc:
+            status, code = "invalid", str(exc)
+        except (ProvenanceError, LedgerError):
+            status, code = (("interrupted", "publication_interrupted") if publishing
+                            else ("invalid", "artifact_or_storage_unavailable"))
+        except (OSError, sqlite3.Error):
+            status, code = "interrupted", "storage_interrupted"
+        except (ValueError, TypeError, KeyError, ArithmeticError, AttributeError):
+            status, code = "invalid", "invalid_semantic_review_evidence"
+        try:
+            store.finish(submission, status, {"error_code": code, "result_kind": "no_semantic_review"})
+        except (OSError, sqlite3.Error, ProvenanceError, LedgerError):
+            return {"submission_id": submission, "status": "pending", "error_code": "publication_interrupted"}
+        return {"submission_id": submission, "status": status, "error_code": code}
+
+
+def _independent_schedule(store, digest, sources, start, end, sessions):
+    schedule = store.read_json(_ref(digest))
+    _need(isinstance(schedule, dict) and set(schedule) == {
+        "schema_version", "kind", "exchange", "timezone", "start", "end", "source_sha256",
+        "sessions", "early_closes", "extraction", "review"}, "invalid_independent_schedule")
+    _need(schedule["schema_version"] == 1 and schedule["kind"] == "independent_exchange_schedule"
+          and schedule["timezone"] == "America/New_York" and schedule["start"] == start
+          and schedule["end"] == end and schedule["source_sha256"] in sources,
+          "independent_schedule_identity_mismatch")
+    _text(schedule["exchange"])
+    _need(schedule["sessions"] == sessions, "independent_schedule_session_mismatch")
+    extraction = schedule["extraction"]
+    refs = _attributed(extraction, sources, direct=True)
+    _need(extraction["source_sha256"] == schedule["source_sha256"], "unbound_schedule_extraction")
+    early = schedule["early_closes"]
+    _need(isinstance(early, dict) and set(early) <= set(sessions), "invalid_early_close_metadata")
+    for value in early.values():
+        _need(isinstance(value, str) and re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value),
+              "invalid_early_close_metadata")
+    review = schedule["review"]
+    _need(isinstance(review, dict) and set(review) == {
+        "reviewer", "reviewed_at", "verdict", "report_sha256"}, "independent_schedule_review_required")
+    _need(_text(review["reviewer"]).strip().casefold() != extraction["author"].strip().casefold()
+          and review["verdict"] == "accepted"
+          and _aware(review["reviewed_at"]) >= _aware(extraction["observed_at"]),
+          "independent_schedule_review_required")
+    report = _ref(review["report_sha256"])
+    _need(bool(store.read_bytes(report)), "empty_schedule_review_report")
+    refs.update({digest, report})
+    return schedule, refs
+
+
+def _regular_way_split(store, wrapper, annotation, sources, symbol, instrument_id, schedule,
+                       schedule_ref, *, before_submission_id=None):
+    value, record = annotation["regular_way_split"], wrapper["record"]
+    allowed_record = DATE_FIELDS | {"id", "symbol", "new_symbol", "cusip", "isin", "old_cusip",
+                                    "new_cusip", "old_isin", "new_isin", "currency", "new_rate", "old_rate"}
+    _need(set(record) <= allowed_record, "unsupported_regular_way_provider_fields")
+    fields = {"schema_version", "profile", "author", "observed_at", "provider_id", "record_sha256",
+              "provider_dates", "source_roles", "issuer_terms", "seller_treatment", "purchaser_entitlement",
+              "economic_scope", "rules_applicability", "date_dispositions"}
+    _need(isinstance(value, dict) and fields <= set(value) <= fields | {"additional_event_corroboration"}
+          and value["schema_version"] == 1
+          and value["profile"] == RULES["regular_way_split"], "unsupported_regular_way_profile")
+    _text(value["author"])
+    observed = _aware(value["observed_at"])
+    _need(value["provider_id"] == record["id"] and value["record_sha256"] == hash_json(record)
+          and hash_json(value["provider_dates"]) == hash_json(_provider_dates(record)), "regular_way_record_mismatch")
+    refs = _annotation_sources(value)
+    _need(refs <= sources, "unbound_primary_judgment")
+    roles = value["source_roles"]
+    additional = value.get("additional_event_corroboration", [])
+    _need(isinstance(additional, list) and len(additional) <= 5, "invalid_additional_event_corroboration")
+    for judgment in additional:
+        _attributed(judgment, sources, direct=True)
+        _need(_aware(judgment["observed_at"]) <= observed, "split_annotation_attribution_mismatch")
+    terms = value["issuer_terms"]
+    term_fields = {"symbol", "instrument_id", "security_type", "new_rate", "old_rate", "record_date",
+                   "distribution_date", "distribution_timing", "first_adjusted_session", "trading_statement"}
+    _attributed(terms, sources, fields=term_fields, direct=True)
+    _need(terms["source_sha256"] == roles["issuer"] and terms["symbol"] == symbol
+          and terms["instrument_id"] == instrument_id and terms["security_type"] == "domestic_common_stock",
+          "regular_way_identity_conflict")
+    ratio = _decimal(record["new_rate"]) / _decimal(record["old_rate"])
+    expected = annotation["event"]
+    _need(wrapper["category"] == "forward_splits" and ratio.denominator == 1 and ratio >= 2,
+          "unsupported_regular_way_ratio")
+    _need(_decimal(terms["new_rate"]) / _decimal(terms["old_rate"]) == ratio
+          and expected["new_rate"] == terms["new_rate"] and expected["old_rate"] == terms["old_rate"],
+          "issuer_split_conflict")
+    record_date, distribution, effective = (_day(terms[name]) for name in (
+        "record_date", "distribution_date", "first_adjusted_session"))
+    _need(effective == record["ex_date"] == expected["effective_date"]
+          and record.get("due_bill_redemption_date") == effective, "regular_way_date_shape_mismatch")
+    _need(record_date <= distribution < effective and terms["distribution_timing"] == "after_close"
+          and terms["trading_statement"] == "expected_or_scheduled", "unsupported_regular_way_terms")
+    sessions = schedule["sessions"]
+    _need(distribution in sessions and effective in sessions
+          and sessions.index(effective) == sessions.index(distribution) + 1,
+          "split_distribution_not_adjacent_session")
+    for key, flag in (("seller_treatment", "transfers_attached_interest"),
+                      ("purchaser_entitlement", "receives_attached_interest")):
+        judgment = value[key]
+        support = _attributed(judgment, sources, fields={flag}, direct=key == "seller_treatment")
+        _need(judgment[flag] is True and roles["issuer"] in support, "unresolved_split_entitlement")
+        if key == "purchaser_entitlement" and judgment["classification"] == "inferred":
+            _need({roles["finra_11140"], roles["finra_11630"]} <= support,
+                  "unbound_purchaser_inference")
+    scope = value["economic_scope"]
+    flags = {"same_security_and_market": True, "separate_entitlement_market": False,
+             "additional_claims_or_cash": False, "elections": False, "fractional_cash_in_lieu": False}
+    scope_refs = _attributed(scope, sources, fields=flags)
+    _need(roles["issuer"] in scope_refs and all(scope[key] is flag for key, flag in flags.items()),
+          "unsupported_split_economic_terms")
+    applicability = value["rules_applicability"]
+    rule_refs = _attributed(applicability, sources, fields={"regime_start"})
+    _need(applicability["regime_start"] == "2024-05-28" and distribution >= "2024-05-28"
+          and {roles["finra_11140"], roles["finra_11630"], roles["finra_notice_24_04"]} <= rule_refs,
+          "unsupported_split_rule_regime")
+    dispositions = value["date_dispositions"]
+    _need(isinstance(dispositions, dict) and set(dispositions) == {
+        "record_date", "payable_date", "due_bill_redemption_date"}, "split_date_dispositions_required")
+    for field, item in dispositions.items():
+        extras = {"status", "controlling_terms_established", "explanation"}
+        if field == "due_bill_redemption_date":
+            extras |= {"documented_meaning", "actual_outcome", "transformation_trigger"}
+        item_refs = _attributed(item, sources, fields=extras)
+        _need(item["controlling_terms_established"] is True and roles["issuer"] in item_refs,
+              "unresolved_controlling_split_terms")
+        _text(item["explanation"])
+        if field == "due_bill_redemption_date":
+            expected_status = "unresolved_ancillary_date_discrepancy"
+            _need(roles["provider_schema"] in item_refs and item["documented_meaning"] == "delivery_obligations"
+                  and item["actual_outcome"] == "unverified"
+                  and item["transformation_trigger"] == "issuer_first_adjusted_session",
+                  "unresolved_redemption_disposition")
+        else:
+            issuer_date = record_date if field == "record_date" else distribution
+            expected_status = ("matches_issuer_date" if record.get(field) == issuer_date
+                               else "unresolved_ancillary_date_discrepancy")
+        _need(item["status"] == expected_status, "ancillary_discrepancy_hidden")
+    for key in ("issuer_terms", "seller_treatment", "purchaser_entitlement", "economic_scope", "rules_applicability"):
+        _need(_aware(value[key]["observed_at"]) <= observed,
+              "split_annotation_attribution_mismatch")
+    for item in dispositions.values():
+        _need(_aware(item["observed_at"]) <= observed,
+              "split_annotation_attribution_mismatch")
+    review_ref = _ref(annotation.get("semantic_review_sha256"))
+    review, review_refs = _registered_review(store, review_ref, before_submission_id=before_submission_id)
+    _need(review["annotation_sha256"] == hash_json(value)
+          and review["reviewed_calendar_sha256"] == schedule_ref, "semantic_review_annotation_mismatch")
+    refs.update(review_refs)
+    return {"profile": value["profile"], "provider_id": record["id"], "annotation": value,
+            "annotation_sha256": hash_json(value), "provider_record": record,
+            "record_sha256": hash_json(record), "occurrences": wrapper["occurrences"],
+            "ratio": str(ratio.numerator), "semantic_review_sha256": review_ref,
+            "independent_schedule_sha256": schedule_ref, "date_dispositions": dispositions,
+            "additional_event_corroboration_status": "retained_attributed" if additional else "not_supplied",
+            "limitations": SPLIT_LIMITATIONS}, refs
 
 
 def _receipt(store, digest, kind, submitted):
@@ -267,7 +597,8 @@ def _excluded_cash_merger(wrapper, annotation, sources, symbol, start, identifie
             "annotation": annotation, "record_sha256": hash_json(record),
             "occurrences": wrapper["occurrences"]}
 
-def _actions(records, facts, sources, symbol, start, end, sessions):
+def _actions(records, facts, sources, symbol, start, end, sessions, *, store=None, schedule=None,
+             schedule_ref=None, instrument_id=None, before_submission_id=None):
     annotations = facts.get("events")
     _need(isinstance(annotations, list), "primary_event_facts_required")
     by_id = {}
@@ -299,6 +630,7 @@ def _actions(records, facts, sources, symbol, start, end, sessions):
             unique[event_id] = (key, {"category": category, "record": record,
                                      "occurrences": list(wrapper["occurrences"])})
     event_keys, events, used, deferred, excluded = set(), [], set(), [], []
+    treatments, treatment_refs = [], set()
     identifiers = {"cusip": set(), "isin": set()}
     for _, wrapper in unique.values():
         category, record = wrapper["category"], wrapper["record"]
@@ -338,16 +670,27 @@ def _actions(records, facts, sources, symbol, start, end, sessions):
             new, old = _decimal(record.get("new_rate")), _decimal(record.get("old_rate"))
             _need(new != old and (new > old if category == "forward_splits" else new < old),
                   "split_direction_mismatch")
-            _need(not record.get("due_bill_redemption_date"), "unsupported_due_bill")
             event = {"kind": "split", "event_id": event_id, "effective_date": ex_date,
                      "new_rate": record["new_rate"], "old_rate": record["old_rate"]}
             _need(expected.get("kind") == "split" and expected.get("event_id") == event_id
                   and expected.get("effective_date") == ex_date
-                  and _decimal(expected.get("new_rate")) == new
-                  and _decimal(expected.get("old_rate")) == old
                   and set(expected) == set(event), "issuer_split_conflict")
+            if "regular_way_split" in annotation:
+                _need(store is not None and schedule is not None, "regular_way_evidence_required")
+                treatment, found = _regular_way_split(
+                    store, wrapper, annotation, sources, symbol, instrument_id, schedule, schedule_ref,
+                    before_submission_id=before_submission_id)
+                treatments.append(treatment)
+                treatment_refs.update(found)
+            else:
+                _need(not record.get("due_bill_redemption_date"), "unsupported_due_bill")
+                _need("semantic_review_sha256" not in annotation, "unmatched_semantic_review")
+                _need(_decimal(expected.get("new_rate")) == new
+                      and _decimal(expected.get("old_rate")) == old, "issuer_split_conflict")
             event = dict(expected)
         else:
+            _need("regular_way_split" not in annotation and "semantic_review_sha256" not in annotation,
+                  "unsupported_regular_way_profile")
             _need(record.get("special") is False and record.get("foreign") is False
                   and record.get("sub_type") in (None, "", "ordinary")
                   and not record.get("due_bill_on_date") and not record.get("due_bill_off_date"),
@@ -398,14 +741,16 @@ def _actions(records, facts, sources, symbol, start, end, sessions):
         _need(day not in dates, "unsupported_coincident_actions")
         dates[day] = event["kind"]
     return (sorted(events, key=lambda event: (event.get("effective_date", event.get("ex_date")), event["event_id"])),
-            sorted(excluded, key=lambda item: item["annotation"]["provider_id"]))
+            sorted(excluded, key=lambda item: item["annotation"]["provider_id"]),
+            sorted(treatments, key=lambda item: item["provider_id"]), treatment_refs)
 
 
-def _verify(store, request):
+def _verify(store, request, *, before_submission_id=None):
     from quanto.explorer import _dataset, _bars, _bar_json, _code_identity
     required = {"dataset_sha256", "bars_receipt_sha256", "calendar_receipt_sha256",
                 "actions_receipt_sha256", "primary_facts_sha256", "usage_review_sha256", "submitted_requests"}
-    _need(set(request) == required and set(request["submitted_requests"]) == {"bars", "calendar", "actions"},
+    _need(required <= set(request) <= required | {"policy_revision_sha256"}
+          and set(request["submitted_requests"]) == {"bars", "calendar", "actions"},
           "invalid_admission_fields")
     dataset = _dataset(store, _ref(request["dataset_sha256"]))
     _need(dataset["evidence_kind"] == "historical_market_data" and dataset["price_basis"] == "raw"
@@ -464,7 +809,25 @@ def _verify(store, request):
     coverage = facts.get("coverage", {})
     _judgment(coverage, primary_documents)
     _need(coverage.get("start") == start and coverage.get("end") == end, "issuer_coverage_mismatch")
-    events, exclusions = _actions(action_source["records"], facts, primary_documents, symbol, start, end, sessions)
+    new_profile = any("regular_way_split" in event for event in facts.get("events", []))
+    schedule, schedule_ref, revision = None, None, None
+    if new_profile:
+        _need("policy_revision_sha256" in request, "regular_way_policy_revision_required")
+        schedule_ref = _ref(facts.get("independent_schedule_sha256"))
+        schedule, schedule_refs = _independent_schedule(
+            store, schedule_ref, primary_documents, start, end, sessions)
+        refs.update(schedule_refs)
+        receipt_sources = {source["sha256"] for source in facts["sources"] if "receipt_sha256" in source}
+        required_sources = {schedule["source_sha256"]}
+        for event in facts["events"]:
+            if "regular_way_split" in event:
+                required_sources.update(_annotation_sources(event["regular_way_split"]))
+        _need(required_sources <= receipt_sources, "regular_way_source_receipts_required")
+    events, exclusions, treatments, treatment_refs = _actions(
+        action_source["records"], facts, primary_documents, symbol, start, end, sessions,
+        store=store, schedule=schedule, schedule_ref=schedule_ref,
+        instrument_id=market["instrument_id"], before_submission_id=before_submission_id)
+    refs.update(treatment_refs)
     _need(isinstance(coverage.get("known_events"), list)
           and sorted(coverage["known_events"], key=hash_json) == sorted(events, key=hash_json),
           "known_issuer_events_unmatched")
@@ -477,12 +840,25 @@ def _verify(store, request):
     _need(isinstance(usage.get("unresolved"), list)
           and "account_and_exchange_terms_not_certified" in usage["unresolved"], "source_use_limitations_required")
     refs.update(primary_sources | usage_sources | {request["primary_facts_sha256"], request["usage_review_sha256"]})
-    return {"schema_version": 1, "kind": "historical_admission", "request": request,
+    if "policy_revision_sha256" in request:
+        from quanto.policy_revision import validate_revision, PolicyRevisionError
+        try:
+            revision = validate_revision(store, _ref(request["policy_revision_sha256"]), request,
+                                         before_submission_id=before_submission_id)
+        except PolicyRevisionError as exc:
+            raise AdmissionError(str(exc)) from None
+        refs.update(revision["artifact_refs"])
+        refs.add(request["policy_revision_sha256"])
+    result = {"schema_version": 1, "kind": "historical_admission", "request": request,
             "dataset_sha256": request["dataset_sha256"], "scope": RULES["scope"], "rules": RULES,
             "code_identity": _code_identity(), "actions": events, "excluded_actions": exclusions, "sessions": sessions,
+            "accepted_action_treatments": treatments,
             "full_acquired_exposure": {"start": start, "end": end}, "market": market,
             "request_parameters_sha256": hash_json({kind: receipts[kind]["request"] for kind in receipts}),
-            "limitations": LIMITATIONS, "artifact_refs": sorted(refs)}
+            "limitations": LIMITATIONS + (SPLIT_LIMITATIONS if treatments else []), "artifact_refs": sorted(refs)}
+    if revision is not None:
+        result.update(policy_revision_sha256=request["policy_revision_sha256"], policy_revision=revision)
+    return result
 
 
 def admit_dataset(root: Path, request: dict | str) -> dict:
@@ -493,7 +869,7 @@ def admit_dataset(root: Path, request: dict | str) -> dict:
         submission = store.begin("historical_admission", frozen)
         publishing = False
         try:
-            result = _verify(store, _request(frozen))
+            result = _verify(store, _request(frozen), before_submission_id=submission)
             publishing = True
             digest = store.put_json(result)
             details = {"admission_sha256": digest, "dataset_sha256": result["dataset_sha256"],
@@ -520,12 +896,12 @@ def validate_admission(store: Provenance, admission_sha256: str, dataset_sha256:
     admission = store.read_json(_ref(admission_sha256))
     _need(admission.get("dataset_sha256") == dataset_sha256, "admission_dataset_mismatch")
     rows = store.journal.connection.execute(
-        "SELECT details FROM provenance_outcomes JOIN provenance_submissions USING(submission_id) "
+        "SELECT submission_id,details FROM provenance_outcomes JOIN provenance_submissions USING(submission_id) "
         "WHERE status='success' AND kind='historical_admission'").fetchall()
-    import json
-    _need(any(json.loads(row[0]).get("admission_sha256") == admission_sha256 for row in rows),
-          "admission_not_registered")
-    verified = _verify(store, admission["request"])
+    registered = [row["submission_id"] for row in rows
+                  if json.loads(row["details"]).get("admission_sha256") == admission_sha256]
+    _need(bool(registered), "admission_not_registered")
+    verified = _verify(store, admission["request"], before_submission_id=registered[0])
     # This terminal comparison deliberately does not depend on the validation
     # helper whose loaded implementation is itself part of the identity.
     if verified != admission:

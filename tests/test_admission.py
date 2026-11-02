@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 
 import pytest
 
@@ -9,7 +10,7 @@ from quanto.admission import admit_dataset, validate_admission, AdmissionError
 from quanto.alpaca_data import acquire_bars, acquire_calendar, Credentials, HTTPResult
 from quanto.alpaca_actions import acquire_actions
 from quanto.explorer import register_dataset, run_submission, list_exposures
-from quanto.ledger import canonical_json
+from quanto.ledger import canonical_json, hash_json
 from quanto.provenance import Provenance
 
 CLOCK = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
@@ -546,7 +547,7 @@ def test_completed_pre_window_cash_merger_exclusion_keeps_exact_evidence(tmp_pat
     outcome = admit_dataset(tmp_path, request)
     assert outcome['status'] == 'success', outcome
     admission = get(tmp_path, outcome['admission_sha256'])
-    assert admission['rules']['version'] == 'D006-admission-v1.1'
+    assert admission['rules']['version'] == 'D007-admission-v1'
     assert admission['actions'] == [SPLIT, DIVIDEND]
     assert len(admission['excluded_actions']) == 1
     exclusion = admission['excluded_actions'][0]
@@ -734,3 +735,428 @@ def test_new_exclusion_never_overwrites_original_refusal(tmp_path):
     with Provenance(tmp_path) as store:
         assert store.get_submission(first['submission_id'])['status'] == 'invalid'
         assert store.get_submission(second['submission_id'])['status'] == 'success'
+
+
+def regular_way_fixture(root, *, provider_change=None, annotation_change=None, schedule_change=None,
+                        review_change=None, register_review=True, register_policy=True):
+    """Invented sources; exercise actual refusals, registrations and admission APIs."""
+    from quanto.admission import _provider_dates, register_split_semantic_review
+    from quanto.policy_revision import APPROVED_REVIEWS, FROZEN_FIELDS, register_revision
+    from test_policy_revision import _plan, _record_plan
+    full_plan = _plan()
+    with Provenance(root) as store:
+        plans = [_record_plan(store, full_plan)]
+        predecessor = {**full_plan, 'previous_plan_bytes_sha256': plans[0]['plan_sha256']}
+        plans.append(_record_plan(store, predecessor))
+    def change_actions(actions):
+        actions['forward_splits'][0].update(record_date='2024-06-05', payable_date=None,
+                                           due_bill_redemption_date='2024-06-10')
+        if provider_change:
+            actions['forward_splits'][0].update(provider_change)
+        # Preserve an actual initial identity-change refusal before split checking.
+        merger = actions.pop('cash_mergers')
+        original = deepcopy(actions)
+        actions.clear()
+        actions['cash_mergers'] = merger
+        actions.update(original)
+    prior = merger_evidence(root, actions_mutate=change_actions)
+    prior_facts = get(root, prior['primary_facts_sha256'])
+    initial_facts = deepcopy(prior_facts)
+    del initial_facts['excluded_actions']
+    initial_request = {**prior, 'primary_facts_sha256': put(root, initial_facts)}
+    initial = admit_dataset(root, initial_request)
+    assert initial['error_code'] == 'identity_change_unresolved', initial
+    with Provenance(root) as store:
+        initial_ref = store.put_bytes(canonical_json(initial_request).encode())
+        refined = {**predecessor, 'previous_plan_bytes_sha256': plans[-1]['plan_sha256'],
+                   'relevance_refinement': {
+                       'kind': 'implementation_of_preexisting_structured_exclusion',
+                       'facts_sha256': prior['primary_facts_sha256'],
+                       'original_admission_refusal': initial['submission_id'],
+                       'portfolio_result_observed_before_refinement': False,
+                       'strategy_window_costs_unchanged': True}}
+        plans.append(_record_plan(store, refined, 'pilot_plan_refinement'))
+    refused = admit_dataset(root, prior)
+    assert refused['status'] == 'invalid', refused
+    # Invalid provider changes can fail before due-bill handling. Their positive
+    # lineage is unnecessary: focused validators reject them before revision use.
+    with Provenance(root) as store:
+        prior_ref = store.put_bytes(canonical_json(prior).encode())
+        roles = {}
+        facts = deepcopy(prior_facts)
+        for role in ['issuer', 'finra_11140', 'finra_11630', 'finra_notice_24_04', 'provider_schema', 'schedule']:
+            digest = store.put_bytes(('SYNTHETIC source only: ' + role).encode())
+            roles[role] = digest
+            url = 'https://synthetic.example/' + role
+            submission = store.begin('public_source_observation', {'url': url})
+            receipt = store.put_json({'kind': 'public_source_receipt', 'source_sha256': digest,
+                                     'url': url, 'submission_id': submission,
+                                     'retrieved_at': CLOCK.isoformat()})
+            store.finish(submission, 'success', {'receipt_sha256': receipt, 'artifact_refs': [digest, receipt]})
+            facts['sources'].append({'sha256': digest, 'url': url, 'title': 'Synthetic ' + role,
+                                     'locator': 'fixture section', 'receipt_sha256': receipt})
+        def judgment(source='issuer', *, inferred=False, support=()):
+            return {'source_sha256': roles[source], 'locator': 'fixture section',
+                    'judgment': 'Synthetic source-bound judgment; no actual issuer or rule claim.',
+                    'author': 'synthetic producer', 'observed_at': CLOCK.isoformat(),
+                    'classification': 'inferred' if inferred else 'direct',
+                    'supporting_sources': [{'source_sha256': roles[name], 'locator': 'fixture section'}
+                                           for name in support]}
+        schedule = {'schema_version': 1, 'kind': 'independent_exchange_schedule',
+                    'exchange': 'SYNTHETIC exchange schedule', 'timezone': 'America/New_York',
+                    'start': DATES[0], 'end': DATES[-1], 'source_sha256': roles['schedule'],
+                    'sessions': DATES.copy(), 'early_closes': {}, 'extraction': judgment('schedule'),
+                    'review': {'reviewer': 'synthetic schedule reviewer', 'reviewed_at': CLOCK.isoformat(),
+                               'verdict': 'accepted', 'report_sha256': store.put_bytes(b'SYNTHETIC schedule review')}}
+        if schedule_change:
+            schedule_change(schedule)
+        facts['independent_schedule_sha256'] = store.put_json(schedule)
+        normalized = store.read_json(store.read_json(prior['actions_receipt_sha256'])['normalized_sha256'])
+        record = next(row['record'] for row in normalized['records'] if row['category'] == 'forward_splits')
+        dispositions = {}
+        for field, day in [('record_date', '2024-06-05'), ('payable_date', '2024-06-07')]:
+            dispositions[field] = {**judgment(inferred=True), 'controlling_terms_established': True,
+                                  'status': ('matches_issuer_date' if record.get(field) == day
+                                             else 'unresolved_ancillary_date_discrepancy'),
+                                  'explanation': 'Synthetic issuer terms establish controlling economic dates.'}
+        dispositions['due_bill_redemption_date'] = {
+            **judgment(inferred=True, support=('provider_schema',)), 'controlling_terms_established': True,
+            'status': 'unresolved_ancillary_date_discrepancy', 'documented_meaning': 'delivery_obligations',
+            'actual_outcome': 'unverified', 'transformation_trigger': 'issuer_first_adjusted_session',
+            'explanation': 'Synthetic issuer terms establish E; provider delivery outcome remains unverified.'}
+        value = {'schema_version': 1, 'profile': 'domestic_integer_forward_split_v1',
+                 'author': 'synthetic producer', 'observed_at': CLOCK.isoformat(), 'provider_id': 'split1',
+                 'record_sha256': hash_json(record), 'provider_dates': _provider_dates(record),
+                 'source_roles': {key: val for key, val in roles.items() if key != 'schedule'},
+                 'issuer_terms': {**judgment(), 'symbol': 'FIX', 'instrument_id': MARKET['instrument_id'],
+                                  'security_type': 'domestic_common_stock', 'new_rate': '10', 'old_rate': '1',
+                                  'record_date': '2024-06-05', 'distribution_date': '2024-06-07',
+                                  'distribution_timing': 'after_close', 'first_adjusted_session': '2024-06-10',
+                                  'trading_statement': 'expected_or_scheduled'},
+                 'seller_treatment': {**judgment(), 'transfers_attached_interest': True},
+                 'purchaser_entitlement': {**judgment(inferred=True, support=('finra_11140', 'finra_11630')),
+                                           'receives_attached_interest': True},
+                 'economic_scope': {**judgment(inferred=True), 'same_security_and_market': True,
+                                    'separate_entitlement_market': False, 'additional_claims_or_cash': False,
+                                    'elections': False, 'fractional_cash_in_lieu': False},
+                 'rules_applicability': {**judgment('finra_notice_24_04', inferred=True,
+                                                   support=('finra_11140', 'finra_11630')),
+                                         'regime_start': '2024-05-28'}, 'date_dispositions': dispositions}
+        if annotation_change:
+            annotation_change(value)
+        annotation_ref = store.put_json(value)
+        review = {'schema_version': 1, 'kind': 'regular_way_split_semantic_review',
+                  'annotation_sha256': annotation_ref, 'author': value['author'],
+                  'reviewer': 'synthetic semantic reviewer', 'reviewer_kind': 'native_agent',
+                  'reviewed_at': CLOCK.isoformat(), 'verdict': 'accepted_with_qualifications',
+                  'reviewed_sources': sorted(roles.values()),
+                  'reviewed_calendar_sha256': facts['independent_schedule_sha256'],
+                  'report_sha256': store.put_bytes(b'SYNTHETIC semantic review, not an actual independent review.')}
+        if review_change:
+            review_change(review)
+        review_ref = store.put_json(review)
+        facts['events'][0].update(regular_way_split=value, semantic_review_sha256=review_ref)
+        next_facts = store.put_json(facts)
+        revision_request = {'schema_version': 1, 'kind': 'policy_revision_request', 'predecessor_plans': plans,
+                            'refused_admissions': [
+                                {'submission_id': initial['submission_id'], 'request_sha256': initial_ref},
+                                {'submission_id': refused['submission_id'], 'request_sha256': prior_ref}],
+                            'accepted_decision_sha256': store.put_bytes(
+                                (Path(__file__).parents[1] / 'docs' / 'D007_POLICY.md').read_bytes()),
+                            'review_sha256s': [store.put_bytes((Path(__file__).parents[1] / 'docs' / 'reviews'
+                                                               / ('D007-' + name + '.md')).read_bytes())
+                                              for name in APPROVED_REVIEWS],
+                            'new_primary_facts_sha256': next_facts,
+                            'frozen_study': {key: full_plan[key] for key in FROZEN_FIELDS},
+                            'classification': 'post_acquisition_development_only'}
+    if register_review:
+        registered = register_split_semantic_review(root, {'review_sha256': review_ref})
+        assert registered['status'] == 'success', registered
+    request = {**prior, 'primary_facts_sha256': next_facts}
+    if register_policy:
+        revised = register_revision(root, revision_request)
+        assert revised['status'] == 'success', revised
+        request['policy_revision_sha256'] = revised['policy_revision_sha256']
+    return request, revision_request
+
+
+def test_regular_way_admits_bound_economic_treatment_and_revalidates(tmp_path):
+    request, _ = regular_way_fixture(tmp_path)
+    admitted = admit_dataset(tmp_path, request)
+    assert admitted['status'] == 'success', admitted
+    with Provenance(tmp_path) as store:
+        verified = validate_admission(store, admitted['admission_sha256'], request['dataset_sha256'])
+    treatment, = verified['accepted_action_treatments']
+    assert verified['actions'] == [SPLIT, DIVIDEND]
+    assert verified['policy_revision']['lineage']['post_acquisition_change_count'] == 2
+    assert treatment['provider_record']['due_bill_redemption_date'] == '2024-06-10'
+    assert treatment['annotation']['provider_dates']['payable_date'] == {'present': True, 'value': None}
+    assert treatment['annotation']['provider_dates']['effective_date'] == {'present': False, 'value': None}
+    assert treatment['date_dispositions']['payable_date']['status'] == 'unresolved_ancillary_date_discrepancy'
+    assert treatment['date_dispositions']['due_bill_redemption_date']['actual_outcome'] == 'unverified'
+    assert treatment['annotation']['purchaser_entitlement']['classification'] == 'inferred'
+    assert treatment['additional_event_corroboration_status'] == 'not_supplied'
+    assert treatment['semantic_review_sha256'] in verified['artifact_refs']
+    assert len(verified['excluded_actions']) == 1
+
+
+def test_equivalent_non_unit_integer_rates_preserve_provider_strings(tmp_path):
+    request, _ = regular_way_fixture(tmp_path, provider_change={'new_rate': '20', 'old_rate': '2'})
+    result = admit_dataset(tmp_path, request)
+    assert result['status'] == 'success', result
+    record = get(tmp_path, result['admission_sha256'])
+    assert record['actions'][0] == SPLIT
+    assert record['accepted_action_treatments'][0]['provider_record']['new_rate'] == '20'
+
+
+@pytest.mark.parametrize('change,code', [
+    (lambda a: a['provider_dates']['payable_date'].update(present=False), 'regular_way_record_mismatch'),
+    (lambda a: a['provider_dates']['payable_date'].update(present=1), 'regular_way_record_mismatch'),
+    (lambda a: a.update(record_sha256='0' * 64), 'regular_way_record_mismatch'),
+    (lambda a: a['issuer_terms'].update(symbol='OTHER'), 'regular_way_identity_conflict'),
+    (lambda a: a['issuer_terms'].update(security_type='adr'), 'regular_way_identity_conflict'),
+    (lambda a: a['issuer_terms'].update(new_rate='20'), 'issuer_split_conflict'),
+    (lambda a: a['issuer_terms'].update(first_adjusted_session='2024-06-11'), 'regular_way_date_shape_mismatch'),
+    (lambda a: a['issuer_terms'].update(distribution_date='2024-06-06'), 'split_distribution_not_adjacent_session'),
+    (lambda a: a['issuer_terms'].update(record_date='2024-06-10'), 'unsupported_regular_way_terms'),
+    (lambda a: a['issuer_terms'].update(distribution_timing='before_open'), 'unsupported_regular_way_terms'),
+    (lambda a: a['seller_treatment'].update(classification='inferred'), 'invalid_judgment_classification'),
+    (lambda a: a['seller_treatment'].update(transfers_attached_interest=False), 'unresolved_split_entitlement'),
+    (lambda a: a['purchaser_entitlement'].update(supporting_sources=[]), 'unbound_purchaser_inference'),
+    (lambda a: a['economic_scope'].update(additional_claims_or_cash=True), 'unsupported_split_economic_terms'),
+    (lambda a: a['economic_scope'].update(separate_entitlement_market=True), 'unsupported_split_economic_terms'),
+    (lambda a: a['rules_applicability'].update(regime_start='2020-01-01'), 'unsupported_split_rule_regime'),
+    (lambda a: a['date_dispositions']['payable_date'].update(status='matches_issuer_date'), 'ancillary_discrepancy_hidden'),
+    (lambda a: a['date_dispositions']['due_bill_redemption_date'].update(actual_outcome='completed'), 'unresolved_redemption_disposition'),
+    (lambda a: a['date_dispositions']['record_date'].update(controlling_terms_established=False), 'unresolved_controlling_split_terms'),
+])
+def test_regular_way_controlling_and_ancillary_refusals(tmp_path, change, code):
+    request, _ = regular_way_fixture(tmp_path, annotation_change=change)
+    result = admit_dataset(tmp_path, request)
+    assert (result['status'], result['error_code']) == ('invalid', code), result
+
+
+@pytest.mark.parametrize('change,code', [
+    (lambda s: s['sessions'].pop(4), 'independent_schedule_session_mismatch'),
+    (lambda s: s.update(start=DATES[1]), 'independent_schedule_identity_mismatch'),
+    (lambda s: s.update(timezone='UTC'), 'independent_schedule_identity_mismatch'),
+    (lambda s: s.update(early_closes={'2024-06-09': '13:00'}), 'invalid_early_close_metadata'),
+    (lambda s: s['review'].update(reviewer='synthetic producer'), 'independent_schedule_review_required'),
+])
+def test_regular_way_independent_schedule_refusals(tmp_path, change, code):
+    request, _ = regular_way_fixture(tmp_path, schedule_change=change)
+    result = admit_dataset(tmp_path, request)
+    assert result['error_code'] == code, result
+
+
+def test_regular_way_requires_registered_revision_and_semantic_review(tmp_path):
+    request, _ = regular_way_fixture(tmp_path, register_review=False)
+    assert admit_dataset(tmp_path, request)['error_code'] == 'split_semantic_review_not_registered_before_admission'
+    request.pop('policy_revision_sha256')
+    assert admit_dataset(tmp_path, request)['error_code'] == 'regular_way_policy_revision_required'
+
+
+@pytest.mark.parametrize('change,code', [
+    (lambda r: r.update(reviewer='synthetic producer'), 'independent_split_reviewer_required'),
+    (lambda r: r.update(reviewer_kind='producer'), 'independent_split_reviewer_required'),
+    (lambda r: r.update(verdict='rejected'), 'split_review_not_accepted'),
+    (lambda r: r.update(reviewed_at='2026-11-02T12:00:00'), 'invalid_review_time'),
+    (lambda r: r.update(reviewed_at='2026-11-01T12:00:00+00:00'), 'semantic_review_precedes_annotation'),
+    (lambda r: r['reviewed_sources'].pop(), 'semantic_review_sources_mismatch'),
+])
+def test_semantic_review_registration_refuses_unreviewed_claims(tmp_path, change, code):
+    from quanto.admission import register_split_semantic_review
+    request, _ = regular_way_fixture(tmp_path, review_change=change, register_review=False)
+    review = get(tmp_path, request['primary_facts_sha256'])['events'][0]['semantic_review_sha256']
+    result = register_split_semantic_review(tmp_path, {'review_sha256': review})
+    assert (result['status'], result['error_code']) == ('invalid', code), result
+
+
+def test_semantic_review_registered_after_submission_cannot_retroactively_approve(tmp_path):
+    from quanto.admission import _verify, register_split_semantic_review
+    request, _ = regular_way_fixture(tmp_path, register_review=False)
+    with Provenance(tmp_path) as store:
+        submission = store.begin('historical_admission', request)
+        review = store.read_json(request['primary_facts_sha256'])['events'][0]['semantic_review_sha256']
+    assert register_split_semantic_review(tmp_path, {'review_sha256': review})['status'] == 'success'
+    with Provenance(tmp_path) as store:
+        with pytest.raises(AdmissionError, match='split_semantic_review_not_registered_before_admission'):
+            _verify(store, request, before_submission_id=submission)
+
+
+@pytest.mark.parametrize('rates,code', [
+    ({'new_rate': '5', 'old_rate': '2'}, 'unsupported_regular_way_ratio'),
+    ({'new_rate': '1/2'}, 'invalid_action_rate'),
+    ({'new_rate': '10.000000000000000000000000001'}, 'unsupported_regular_way_ratio'),
+    ({'due_bill_redemption_date': '2024-06-11'}, 'regular_way_date_shape_mismatch'),
+])
+def test_due_bill_profile_exact_ratio_and_redemption_guard(tmp_path, rates, code):
+    # An earlier malformed-rate refusal cannot form valid D007 policy lineage;
+    # supply an unread placeholder revision because the economic check runs first.
+    request, _ = regular_way_fixture(tmp_path, provider_change=rates, register_policy=False)
+    request['policy_revision_sha256'] = '0' * 64
+    assert admit_dataset(tmp_path, request)['error_code'] == code
+
+
+@pytest.mark.parametrize('closes,trade_day,side,quantity,cash', [
+    ([90, 100, 100, 100, 100, 100, 100, 10], '2024-06-03', 'buy', '100', '0'),
+    ([100, 90, 90, 90, 100, 100, 100, 10], '2024-06-06', 'buy', '100', '0'),
+    ([100, 90, 90, 90, 90, 100, 100, 10], '2024-06-07', 'buy', '100', '0'),
+    ([100, 90, 90, 90, 90, 90, 100, 10], '2024-06-10', 'buy', '100', '0'),
+    ([90, 100, 100, 100, 100, 100, 90, 9], '2024-06-10', 'sell', '0', '900'),
+    ([90, 100, 90, 90, 90, 90, 90, 9], '2024-06-04', 'sell', '0', '900'),
+    ([90, 100, 100, 100, 90, 90, 90, 9], '2024-06-06', 'sell', '0', '900'),
+])
+def test_admitted_canonical_split_through_actual_prior_close_target_path(
+        tmp_path, closes, trade_day, side, quantity, cash):
+    from decimal import Decimal
+    from quanto.event_engine import run_event_backtest
+    from quanto.research import Bar, StrategySpec
+    request, _ = regular_way_fixture(tmp_path)
+    admission = admit_dataset(tmp_path, request)
+    assert admission['status'] == 'success', admission
+    split = get(tmp_path, admission['admission_sha256'])['actions'][0]
+    # Entirely invented market path: R=June5, P=June7, E=June10. Entry and
+    # exit cases cross R and E through actual strategy targets, not seeded shares.
+    dates = ['2024-05-30', '2024-05-31', *DATES[:6]]
+    supplied = []
+    for index, (day, close) in enumerate(zip(dates, closes)):
+        opening = 100 if index == 2 else close
+        supplied.append(Bar(datetime.fromisoformat(day + 'T16:00:00+00:00'), 'FIX', opening,
+                            max(opening, close), min(opening, close), close, 100))
+    result = run_event_backtest(supplied, StrategySpec(2, starting_cash=1000),
+                               corporate_action_events=[split])['strategy']
+    matching = [trade for trade in result['trades'] if trade['execution_session'] == trade_day]
+    assert len(matching) == 1 and matching[0]['side'] == side
+    assert matching[0]['signal_session'] < trade_day
+    assert Decimal(result['ending_quantity']) == Decimal(quantity)
+    assert Decimal(result['ending_cash']) == Decimal(cash)
+    assert result['ending_receivables'] == []  # No orphan or duplicate split claim.
+    flows = [event for event in result['event_flows'] if event['kind'] == 'split']
+    assert len(flows) == 1
+    assert Decimal(flows[0]['quantity_after']) == 10 * Decimal(flows[0]['quantity_before'])
+    # E's close cannot alter the already executed E-open target.
+    from dataclasses import replace
+    altered = supplied[:-1] + [replace(supplied[-1], close=1000, high=1000)]
+    second = run_event_backtest(altered, StrategySpec(2, starting_cash=1000),
+                               corporate_action_events=[split])['strategy']
+    assert second['trades'] == result['trades']
+
+
+def test_regular_way_prior_cash_claim_is_never_split_or_orphaned(tmp_path):
+    from decimal import Decimal
+    from quanto.event_engine import run_event_backtest
+    from quanto.research import Bar, StrategySpec
+    request, _ = regular_way_fixture(tmp_path)
+    admitted = admit_dataset(tmp_path, request)
+    split = get(tmp_path, admitted['admission_sha256'])['actions'][0]
+    supplied = [Bar(datetime.fromisoformat(day + 'T16:00:00+00:00'), 'FIX', close, close, close, close, 100)
+                for day, close in zip(['2024-05-30', '2024-05-31', *DATES[:6]],
+                                      [90, 100, 100, 100, 99, 99, 99, 9.9])]
+    dividend = {**DIVIDEND, 'event_id': 'invented-earlier-dividend', 'ex_date': '2024-06-05', 'rate': '1'}
+    report = run_event_backtest(supplied, StrategySpec(2, starting_cash=1000),
+                               corporate_action_events=[dividend, split])
+    for portfolio in ['strategy', 'benchmark']:
+        assert Decimal(report[portfolio]['ending_receivables_total']) == 10
+        claim, = report[portfolio]['ending_receivables']
+        assert claim['event_id'] == 'invented-earlier-dividend'
+
+
+def test_semantic_review_tombstone_requires_new_evidence(tmp_path):
+    request, _ = regular_way_fixture(tmp_path)
+    admitted = admit_dataset(tmp_path, request)
+    review = get(tmp_path, request['primary_facts_sha256'])['events'][0]['semantic_review_sha256']
+    from quanto.provenance import ProvenanceError
+    with Provenance(tmp_path) as store:
+        store.tombstone(review, 'invalid_artifact')
+        with pytest.raises(ProvenanceError):
+            validate_admission(store, admitted['admission_sha256'], request['dataset_sha256'])
+
+
+@pytest.mark.parametrize('source_index', [-6, -5, -4, -3, -2, -1])
+def test_missing_d007_source_receipt_is_not_replaced_by_an_unbound_url(tmp_path, source_index):
+    request, _ = regular_way_fixture(tmp_path)
+    facts = get(tmp_path, request['primary_facts_sha256'])
+    facts['sources'][source_index].pop('receipt_sha256')
+    request['primary_facts_sha256'] = put(tmp_path, facts)
+    assert admit_dataset(tmp_path, request)['error_code'] == 'regular_way_source_receipts_required'
+
+
+def test_unknown_split_economic_fields_cannot_be_hidden_by_annotation(tmp_path):
+    request, _ = regular_way_fixture(tmp_path, provider_change={'separate_entitlement_market': True})
+    assert admit_dataset(tmp_path, request)['error_code'] == 'unsupported_regular_way_provider_fields'
+
+
+@pytest.mark.parametrize('mode', ['publication', 'persistent_finish'])
+def test_semantic_review_publication_interruption_remains_observable(tmp_path, monkeypatch, mode):
+    from quanto.admission import register_split_semantic_review
+    from quanto.provenance import ProvenanceError
+    request, _ = regular_way_fixture(tmp_path, register_review=False)
+    review = get(tmp_path, request['primary_facts_sha256'])['events'][0]['semantic_review_sha256']
+    def fail(*args, **kwargs):
+        raise ProvenanceError('synthetic failure without leaking external details')
+    monkeypatch.setattr(Provenance, 'put_bytes' if mode == 'publication' else 'finish', fail)
+    result = register_split_semantic_review(tmp_path, {'review_sha256': review})
+    assert result['status'] == ('interrupted' if mode == 'publication' else 'pending')
+    with Provenance(tmp_path) as store:
+        assert store.get_submission(result['submission_id'])['status'] == result['status']
+
+
+def test_semantic_review_is_bound_to_exact_annotation_bytes(tmp_path):
+    request, _ = regular_way_fixture(tmp_path)
+    facts = get(tmp_path, request['primary_facts_sha256'])
+    facts['events'][0]['regular_way_split']['date_dispositions']['payable_date']['explanation'] += ' Changed.'
+    request['primary_facts_sha256'] = put(tmp_path, facts)
+    assert admit_dataset(tmp_path, request)['error_code'] == 'semantic_review_annotation_mismatch'
+
+
+def test_regular_way_warmup_rebases_without_inheriting_split_units(tmp_path):
+    from decimal import Decimal
+    from quanto.event_engine import run_event_backtest
+    from quanto.research import Bar, StrategySpec
+    request, _ = regular_way_fixture(tmp_path)
+    admitted = admit_dataset(tmp_path, request)
+    split = get(tmp_path, admitted['admission_sha256'])['actions'][0]
+    supplied = [Bar(datetime.fromisoformat(day + 'T16:00:00+00:00'), 'FIX', close, close, close, close, 100)
+                for day, close in zip(['2024-06-07', '2024-06-10', '2024-06-11'], [100, 10, 10])]
+    report = run_event_backtest(supplied, StrategySpec(2, starting_cash=1000),
+                               corporate_action_events=[split])
+    assert report['strategy']['initial_signal'] == 'cash'
+    assert report['strategy']['trades'] == []
+    assert report['strategy']['event_flows'] == []
+    assert Decimal(report['benchmark']['ending_quantity']) == 100
+
+
+def test_regular_way_future_event_cannot_change_completed_prefix(tmp_path):
+    from quanto.event_engine import run_event_backtest
+    from quanto.research import Bar, StrategySpec
+    request, _ = regular_way_fixture(tmp_path)
+    admitted = admit_dataset(tmp_path, request)
+    split = get(tmp_path, admitted['admission_sha256'])['actions'][0]
+    supplied = [Bar(datetime.fromisoformat(day + 'T16:00:00+00:00'), 'FIX', close, close, close, close, 100)
+                for day, close in zip(DATES[:5], [90, 100, 105, 90, 100])]
+    with_future = run_event_backtest(supplied, StrategySpec(2, starting_cash=1000), corporate_action_events=[split])
+    without_future = run_event_backtest(supplied, StrategySpec(2, starting_cash=1000))
+    assert with_future['strategy'] == without_future['strategy']
+    assert with_future['benchmark'] == without_future['benchmark']
+
+
+def test_regular_way_preserves_qualified_empty_and_null_ancillary_dates(tmp_path):
+    request, _ = regular_way_fixture(tmp_path, provider_change={'record_date': None, 'payable_date': ''})
+    result = admit_dataset(tmp_path, request)
+    assert result['status'] == 'success', result
+    treatment = get(tmp_path, result['admission_sha256'])['accepted_action_treatments'][0]
+    assert treatment['annotation']['provider_dates']['record_date'] == {'present': True, 'value': None}
+    assert treatment['annotation']['provider_dates']['payable_date'] == {'present': True, 'value': ''}
+    for field in ['record_date', 'payable_date']:
+        assert treatment['date_dispositions'][field]['status'] == 'unresolved_ancillary_date_discrepancy'
+
+
+def test_distinct_judgment_producer_cannot_review_their_own_annotation(tmp_path):
+    from quanto.admission import register_split_semantic_review
+    request, _ = regular_way_fixture(
+        tmp_path, annotation_change=lambda a: a['seller_treatment'].update(author='separate extractor'),
+        review_change=lambda r: r.update(reviewer=' Separate Extractor '), register_review=False)
+    review = get(tmp_path, request['primary_facts_sha256'])['events'][0]['semantic_review_sha256']
+    result = register_split_semantic_review(tmp_path, {'review_sha256': review})
+    assert result['error_code'] == 'independent_split_reviewer_required'

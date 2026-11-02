@@ -16,7 +16,8 @@ def test_submission_query_does_not_initialize_empty_workspace(tmp_path, capsys):
 
 
 @pytest.mark.parametrize('command', ['acquire-bars', 'acquire-calendar', 'acquire-actions',
-                                     'admit-dataset'])
+                                     'admit-dataset', 'register-split-review',
+                                     'register-policy-revision', 'register-suite', 'run-suite'])
 def test_malformed_json_is_recorded_before_credentials_or_network(tmp_path, capsys, command):
     path = tmp_path / 'invalid.json'
     marker = 'synthetic-sensitive-request-content'

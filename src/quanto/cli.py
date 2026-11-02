@@ -94,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
         ("acquire-actions", "Acquire private corporate-action observations for inspection"),
         ("register-dataset", "Register exact dataset bytes and their declared scope"),
         ("admit-dataset", "Check evidence for retrospective historical development research"),
+        ("register-split-review", "Record an independent review of exact split evidence"),
+        ("register-policy-revision", "Preserve and validate post-acquisition policy lineage"),
+        ("register-suite", "Register all three cost scenarios before calculation"),
+        ("run-suite", "Execute a complete registered scenario roster once"),
         ("explore", "Record and execute an eligible exploratory study"),
     ):
         command = sub.add_parser(name, help=description)
@@ -118,7 +122,8 @@ def main(argv: list[str] | None = None) -> int:
             output = request_review(root, args.packet.read_text())
             output = {key: value for key, value in output.items() if key != "text"}
         elif args.command in {"acquire-bars", "acquire-calendar", "acquire-actions",
-                              "register-dataset", "admit-dataset", "explore"}:
+                              "register-dataset", "admit-dataset", "explore", "register-split-review",
+                              "register-policy-revision", "register-suite", "run-suite"}:
             request = _request_text(args.request)
             if args.command in {"acquire-bars", "acquire-calendar"}:
                 from quanto.alpaca_data import acquire_bars, acquire_calendar
@@ -129,6 +134,15 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "admit-dataset":
                 from quanto.admission import admit_dataset
                 action = admit_dataset
+            elif args.command == "register-split-review":
+                from quanto.admission import register_split_semantic_review
+                action = register_split_semantic_review
+            elif args.command == "register-policy-revision":
+                from quanto.policy_revision import register_revision
+                action = register_revision
+            elif args.command in {"register-suite", "run-suite"}:
+                from quanto.study_suite import register_suite, run_suite
+                action = register_suite if args.command == "register-suite" else run_suite
             else:
                 from quanto.explorer import register_dataset, run_submission
                 action = register_dataset if args.command == "register-dataset" else run_submission

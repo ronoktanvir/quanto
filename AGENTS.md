@@ -6,6 +6,8 @@ Read docs/CONTEXT.md, docs/STATUS.md, docs/ROADMAP.md, and docs/DECISIONS.md bef
 
 Build a private research and eventual trading operation for the owner's own account. The complete target includes data ingestion, deterministic research, five bounded research roles, independent criticism, quality validation, scope review, durable failure memory, reliable scheduling, and separately gated execution. A prototype is not the complete operation. No subscription purchases. Outside-model API work is authorized through an existing account with a shared maximum of USD 20 per America/Los_Angeles calendar day. Do not claim that a local ledger controls spending by unrelated clients of that account.
 
+Owner update on November2: renting Runpod network storage at roughly USD5/month is explicitly authorized for external checkpoints. The owner subsequently confirmed the key is ready and authorized up to USD50 total Runpod setup spending; treat this as a cumulative ceiling, not a monthly increase. This is a narrow exception to the no-purchase constraint, separate from the unchanged model-spending ceiling; it does not authorize GPU/CPU compute rental or unrelated subscriptions. Prepare the concrete storage/backup plan before transferring project data. Credentials stay in ignored local files and must never enter chat, logs or Git.
+
 Research must not place live broker orders. Live promotion requires a concrete reviewed strategy, operational checks, and explicit owner approval. Keep research workers separate from execution credentials. Do not fabricate market data, model reviews, test results, benchmark claims, or completed milestones.
 
 ## Collaboration

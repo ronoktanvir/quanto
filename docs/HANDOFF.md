@@ -1,8 +1,28 @@
 # Resume here
 
+## Prompt integration after completed retained-result audit
+
+The isolated prompt commit was cherry-picked as `f44c30d`. Exact packet/test bytes match independent critic/quality identities; root lint and repository hygiene checks pass. Separate actual quality and scope accepted the retained partial numerical evidence and narrow prompt integration. Do not run old current-source verifiers against this changed packet identity. No new paid workflow or allocation increase occurred. GitHub integration is next; D009 storage work stays a separate increment.
+
+## Actual v5 numerical audit — current checkpoint
+
+Root executed reviewed v5 once on the unchanged third receipt: exit0, stderr0,3 independent reference cases/882 fields passed,9 derivative operands agree,7 observed responses/6 published stages, one inconclusive review and the full uncertain scope hold preserved. Verification submission4a26a7efbebb42e9afca9263f386a68c, artifactb43f56c07f2041ec00fa1aca0fe48c20582e77dd59be2b19b1fe304762a6ff15. Read D008-partial-actual-numerical.md. Workflow remains invalid; no paid/financial rerun. V4 had a reproduced missing failed-review contract comparison; v5 SHA9baac52f086a363e9161796807b2c9d64e0c75df409cb0d82905195d4f5f9018 closes it and independent critic rechecked. Separate safe-summary quality confirmed exact identities and qualifications; scope finalization pending, then integrate isolated prompt commit75910f399333eb98f09b23f07715bec19c980cfc. Do not rerun old harnesses against changed current sources.
+
+Runpod management and S3 authentication both passed. Existing credit is sufficient; no deposit, resource or transfer yet. Five storage perspectives and D009 proposal are preparing the required actual CLI council. First stage is10GBSTANDARDUS-WA-1 and encrypted synthetic canary only, roughlyUSD0.70/month, below the owner's50total cap. Actual project backup/key custody/restore and trusted external freshness remain later explicit acceptance gates. A first documentation-update command had a Python quoting error before execution; corrected without changing actual audit evidence.
+
+
+## Runpod authorization update — November2
+
+The owner confirmed credential setup and authorized up to USD50 total Runpod setup spending. Preserve the roughly USD5/month storage target; this does not raise the shared USD20/day model budget or USD4/day research-purpose allowance, authorize compute, or permit unbounded recurring spend. Root observed RUNPOD_API_KEY present in ignored .env with mode0600; separate S3 credentials were absent. No account call, provision or transfer had yet occurred at this checkpoint. Five perspectives and outside council are being prepared for the storage/recovery policy; independent D008 v4 harness criticism proceeds while primary sources stay frozen.
+
+
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
+Latest owner steering: guarantees at least12hours online runtime, offered Runpod cloud network volume, and explicitly authorizes storage rental aroundUSD5/month. API-key setup instructions are being provided for RUNPOD_API_KEY in primary ignored .env; do not print/read its value into a model. No volume or transfer has occurred. Official current docs: https://docs.runpod.io/get-started/credentials (separate management and S3 keys), https://docs.runpod.io/storage/network-volumes (standard0.07USD/GB/month, create via https://api.runpod.io/v2/network-volumes), https://docs.runpod.io/storage/s3-api (direct access without Pods in supported regions). Storage permission is separate from unchanged model caps; no rented compute authorized. Prepare concrete plan/verified external restore under D008 before claiming unattended operation. Continue numerical audit and isolated prompt review meanwhile.
+
 ## Current third-attempt checkpoint — do not rerun
+
+Parallel isolated increment: managed worktree /Users/ronoktanvir/.codex/worktrees/role-output-clarification/quanto at detached commit75910f399333eb98f09b23f07715bec19c980cfc, based37721ee. Only research_packets.py and tests/test_research_packets.py changed. Source dbfa9010a52581c78179f2e9b2451ebfc1143cbb915437104d7efeaaf58e97eb; tests06c20179370ce6233bd5cf3cd2f096852c603f1cb77413b07bf94038c8d2e428. Explicit fixed all-role decision map/predicate instructions; parser/schema/decisions unchanged. Independent criticism passed393 targeted tests and490 decision/predicate cases, source import/determinism/private-history/bounds checks; final report being written. Separate prompt quality and final scope still required. Do not cherry-pick into primary before actual numerical audit completes; archive managed worktree only after needed commits are integrated and reviewed. Contract report D008-role-output-contract.md is final at453f745e3d21c607c48367eb0a7be6617526131f3343a690dad316e2c6e02320.
 
 Latest independent trace result: new inspect-partial-context-trace.py SHA7c933d1436ab1ad5bfa363d710c7981365fbb964c59b88a6d24bb6018229eee2 ran ONCE; output partial-context-inspection-v3.json SHA57e2f813f82a7668f2e43afcd577d1ebc127f6ca5f1b23fb112a9bcbe0fae9fa.301 checks passed; only all_seven_stages_completed=false. All7 exact actual model responses/bindings/current revalidation,6published stages, scope decision/predicate refusal, and successful fresh parent-bound three-child calculation lineage are independently verified. Data critic remains inconclusive. Critic final report SHA63abe2f02a621a91ccaf02264137ecdc41c31fea9958650c394ab553701bfaaa preserves initial failed inspection too. No numerical validation yet.
 

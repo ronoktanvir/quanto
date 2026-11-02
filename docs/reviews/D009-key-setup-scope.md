@@ -32,7 +32,9 @@ The requested custody statement is correctly limited to an owner report. It is n
 
 ## Independent evidence and exact identities
 
-The critic reports six independent mocked-child tests, including concurrent creation, timeout/interruption retention, nonignored/unsafe target refusal and invalid output without success reporting. Quality reports14 tests plus9 subtests in both the source layout and a separate clean three-file layout, lint in both, and two additional independent tests covering five refusal cases. All use invented values and mocked children. Neither review claims actual permanent-key generation or proves that the current installed programs and checkout will pass; those results will come from the owner-run helper.
+The critic reports six independent mocked-child tests, including concurrent creation, timeout/interruption retention, nonignored/unsafe target refusal and invalid output without success reporting. Quality reports 14 tests plus 9 subtests in both the source layout and a separate clean three-file layout, lint in both, and two additional independent tests covering five refusal cases. All use invented values and mocked children. Neither review claims actual permanent-key generation or proves that the current installed programs and checkout will pass; those results will come from the owner-run helper.
+
+After both reviews completed, the lead separately reported checking that the actual target path is ignored and that no permanent identity exists yet, without reading a secret. That limited checkout observation is lead-attributed; I did not repeat it. It does not establish successful age interoperability, external custody or recovery.
 
 | Inspected artifact | SHA-256 |
 | --- | --- |

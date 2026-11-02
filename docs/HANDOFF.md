@@ -2,6 +2,12 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
+## Current integration checkpoint
+
+PR9 merged as3b2ac39ff3c793b542e7e46b57ee2224178f1c51 after Checks41421353235 passed on exact head22c5b46544b58f4b3e27eb23c55a3e641692dfe8. Current branch is feat/context-workflow-evidence. The following validation checkpoint records its pre-merge review state; the final critic, quality and scope reports are integrated. Quality reports1256 tests+12 subtests in both source and clean installation; all reviewed implementation hashes remain unchanged.
+
+Separate new private harnesses are being prepared without running actual data: inspect-context-trace.py and verify-actual-workflow-v3.py. Old scripts/receipts remain unchanged. The new verifier's initial unsupported-decision default-clearance mismatch was found and corrected before actual use; separate review retains it. Wait for both final harness reviews before a new explicit actual workflow. Current global November2 budget is$0.026618 settled, no current-day holds; recheck before dispatch. No third actual workflow has run. Full goal remains active and incomplete.
+
 ## Qualified failure-context validation checkpoint
 
 Branch feat/failure-applicability now implements the separate D008-applicability-contract. Read RESEARCH_WORKFLOW's failure-context section and D008-applicability-critic.md. Original outcomes, disposition claims, D007 financial identities and both actual stopped workflows remain unchanged. No third paid attempt has run. Exact lineage membership is not a current-applicability or clearance judgment.

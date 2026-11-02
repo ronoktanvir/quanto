@@ -32,6 +32,8 @@ The [separate contract review](reviews/D008-applicability-contract.md) accepts t
 
 The implementation retains a private original retrieval basis and revalidates the exact current evidence for every dependent packet. The basis belongs to the current hypothesis effect, its actual query receipts fall inside its registration interval, and fresh observations bind once to a live assignment and planned request. Independent criticism reproduced two reuse defects and verified their repairs. Separate quality passed1256 tests plus12 subtests in source and clean installation, lint and independent probes; separate scope found no drift. Final review records and Git integration remain pending at this checkpoint. The original two actual stops remain unsuccessful; their causes are not isolated, and there has been no third paid attempt.
 
+The exact qualified-context increment subsequently merged in PR9 after all three independent reviews and final-head CI. This completes implementation integration only; it does not convert either stopped actual trace into a successful workflow.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

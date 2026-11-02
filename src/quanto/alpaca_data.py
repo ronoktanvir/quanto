@@ -208,6 +208,21 @@ def _route(method: str, url: str) -> None:
     if len(query) != len(pairs):
         raise AcquisitionError("route_refused")
     if parsed.netloc == "data.alpaca.markets":
+        if parsed.path == "/v1/corporate-actions":
+            fixed = {"region": "us", "data_quality": "all", "sort": "asc",
+                     "limit": str(PAGE_LIMIT)}
+            required = {*fixed, "symbols", "start", "end"}
+            if (not required <= query.keys() or not query.keys() <= required | {"page_token"}
+                    or any(query.get(key) != value for key, value in fixed.items())
+                    or not SYMBOL.fullmatch(query.get("symbols", ""))
+                    or "page_token" in query and not TOKEN.fullmatch(query["page_token"])):
+                raise AcquisitionError("route_refused")
+            try:
+                if _date(query["end"]) < _date(query["start"]):
+                    raise AcquisitionError("route_refused")
+            except AcquisitionError:
+                raise AcquisitionError("route_refused") from None
+            return
         match = re.fullmatch(r"/v2/stocks/([A-Z][A-Z0-9.-]{0,14})/bars", parsed.path)
         fixed = {**BAR_FIXED, "limit": str(PAGE_LIMIT), "sort": "asc"}
         required = {*fixed, "adjustment", "start", "end"}

@@ -26,6 +26,12 @@ After the method correction passed independent criticism,1133 source/clean tests
 
 The audit identified an empty-review reporting error: method_no_blockers was emitted without any review roles. Future summaries must distinguish not_reached, incomplete and a full explicit review decision, counting only published stage records; old receipts remain preserved with this correction in their interpretation. Separately, failure memory defaults absent disposition to unresolved. That is the absence of an appended correction claim, not proof of current applicability. D007 later admitted a new reviewed policy/source lineage and did not declare the earlier refusals erroneous. Any future contextual relation needs exact policy/source/request ancestry and qualified claim/review/availability evidence. Blindly setting corrected to obtain a model proceed is not acceptable.
 
+### Qualified historical failure context
+
+The [separate contract review](reviews/D008-applicability-contract.md) accepts this bounded correction within D008. Preserve the original status and claim, distinguish a missing claim from an explicit unresolved claim, and transmit evidence-availability qualifications. The relation prior_refusal_in_bound_revision means only exact membership in the fully revalidated current revision's historical refusal lineage. It does not decide present applicability or clear the refusal. No disposition is appended to induce a proceed response, and no financial policy, model choice, access grant or retry allowance changes.
+
+The implementation retains a private original retrieval basis and revalidates the exact current evidence for every dependent packet. The basis belongs to the current hypothesis effect, its actual query receipts fall inside its registration interval, and fresh observations bind once to a live assignment and planned request. Independent criticism reproduced two reuse defects and verified their repairs. Separate quality passed1256 tests plus12 subtests in source and clean installation, lint and independent probes; separate scope found no drift. Final review records and Git integration remain pending at this checkpoint. The original two actual stops remain unsuccessful; their causes are not isolated, and there has been no third paid attempt.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

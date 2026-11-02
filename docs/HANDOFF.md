@@ -2,6 +2,14 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
+## Qualified failure-context validation checkpoint
+
+Branch feat/failure-applicability now implements the separate D008-applicability-contract. Read RESEARCH_WORKFLOW's failure-context section and D008-applicability-critic.md. Original outcomes, disposition claims, D007 financial identities and both actual stopped workflows remain unchanged. No third paid attempt has run. Exact lineage membership is not a current-applicability or clearance judgment.
+
+Frozen sources: research_broker.py aa4f9e93f9fc471273bf2e6c1a0d67acb74583228618cecd17aa9ec513419e34; research_packets.py ead052fb0fe53576eff02a5f7138af16a58b70c0c5fbd164eb196f4af92e0a93; research_failure_context.py b99af35355b14d638770c069791124a8d72774346e5a9677ac74d607bc777208. Exact test identities are in the critic report. Root's332 four-module tests and lint passed; independent criticism's288 focused tests and two reproduced reuse-attack repairs passed. An initial fixture failed because its appended disposition used a code outside its allowlist; corrected to a valid same-visible claim. A root test command named a nonexistent test_dispatch.py and ran zero tests; the corrected test_research_dispatch.py command is the332-pass run. A locale failure in shasum was bypassed with Python hashing and did not alter files.
+
+Separate quality completed1256 tests plus12 subtests in both source and clean noneditable installation, lint and independent lineage/freshness/rollback/egress/refusal probes. Its own arbitrary journal-size assertion initially failed and was replaced by actual event-chain verification; that harness failure is preserved in the report. Separate scope found no drift and is finalizing exact evidence; Git integration follows. Read the final reports for acceptance, rather than treating this lead checkpoint as independent review. After exact reviewed integration, use a new explicit bounded request for any actual attempt, preserve previous traces and independently verify the resulting trace; run numerical acceptance only if financial work actually occurs. R14 and the full operation remain incomplete.
+
 ## Two actual stopped workflows — current checkpoint
 
 Current branch `feat/failure-applicability`, base merge `ecac57bf97552517daf347634bd9795fc12d94d1`. PR8 passed Checks41415219426 on exact head9abfd0b1d41774d1609a88b9de4f93c6be705c0d before merge. The reporting correction and revised trace reviews are integrated; prior review hashes describe their actual checkpoints. The goal remains active and incomplete. No third paid attempt is authorized as a blind repeat.

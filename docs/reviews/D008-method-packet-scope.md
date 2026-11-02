@@ -18,12 +18,12 @@ These changed source/test bytes match the separate final critic and quality repo
 | `docs/reviews/D008-method-packet-critic.md` | `6a33ebc08d35cdce744de816c86276f9e25a7655bfc57959097780ebbc504fcb` |
 | `docs/reviews/D008-method-packet-quality.md` | `fafaf40f87fc716fdc3cdf39316006f58089a646afa40ed5b997631d99ae12c1` |
 | `docs/RESEARCH_WORKFLOW.md` | `44b5a25ea4e4ea9dfa7a358f51f4a8219a8f1a3da2f61d29646511a7087cd3e4` |
-| `docs/STATUS.md` | `c319bbfa1643130f8d964e1cedff7dfbfa750f716111f653fbe394cfd82e9668` |
-| `docs/HANDOFF.md` | `41a7fe44dadc9767bce84a7ff1f85683feaf90cf9fd5396736dd5559d58405a7` |
+| `docs/STATUS.md` | `25652b2b1f8d2844622e40665d81f72325a62899f1002a96bc8458d88ce35df1` |
+| `docs/HANDOFF.md` | `350308efe9d019c784e3d548b66ccf17f71ebc8b6dcdada50d3cb23df7a9c822` |
 | `docs/REQUIREMENTS.md` | `a45ed0ecc61e36784870c24ccba38720163401b631a8579115c78c11270d2953` |
-| `docs/CONTEXT.md` | `617bc3f765a6d477713c70ea37a9d66aa61bf00b2dbd7f12eeec529fd59130b2` |
+| `docs/CONTEXT.md` | `c0faf8be3724bcd7bf165bf2f0323251ae7310f50d2d72195be33fd1fa8c14e1` |
 | `docs/DECISIONS.md` | `2ed0f444a2e56d886828a51eb1be09f205a10bd7474ec62b143e7b7996add94c` |
-| `docs/ROADMAP.md` | `d47a8282090f2d3304346d0d602ee5e893c8356b3338a358d2121defd3adfe21` |
+| `docs/ROADMAP.md` | `fe13fbaf213e9265f9db213ff3fed2cf9d9833b8d843553aa8371f00dec8ff12` |
 | `src/quanto/research_comparison.py` | `c2e933841f1664b62528b4342b37a34e7b3452e7783d91f495f78a6b05d65446` |
 | `src/quanto/event_engine.py` | `cb1a61985ebb08089eab50d00d1e78f09a83fdea6754587af7e871e177175ffc` |
 

@@ -22,6 +22,8 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 import uuid
 from zoneinfo import ZoneInfo
 
+from quanto.snapshots import capture_due
+
 INTERVAL = 10
 TIMEOUT = 2
 STARTUP_GRACE = 10
@@ -144,6 +146,8 @@ def port_occupied(port: int) -> bool:
 
 
 def _runtime(root: Path) -> Path:
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("Project root must be a regular local directory")
     runtime = root / "runtime"
     if runtime.is_symlink():
         raise ValueError("Runtime directory must not be a symlink")
@@ -375,6 +379,8 @@ def supervise(root: Path, port: int, *, once: bool = False) -> dict:
                                     state["service_state"] = "start_failed"
                                     state["reason"] = "owned_child_start_failed"
                     save_state(runtime, state)
+                state["snapshot_capture"] = {"checked_at": timestamp(now),
+                                             **capture_due(root, state, now=now)}
                 save_state(runtime, state)
                 stopped.wait(INTERVAL)
         finally:
@@ -398,7 +404,7 @@ def main(argv=None) -> int:
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
     try:
-        state = supervise(args.root.resolve(), args.port, once=args.once)
+        state = supervise(args.root.absolute(), args.port, once=args.once)
         if args.once:
             print(json.dumps(state, indent=2))
         return 0

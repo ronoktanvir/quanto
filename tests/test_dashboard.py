@@ -149,6 +149,56 @@ def test_missing_snapshot_reports_unavailable_without_progress(desk):
     assert "agents" not in json.loads(body)
 
 
+def test_snapshot_metadata_read_is_side_effect_free_and_local(desk, monkeypatch):
+    from unittest.mock import Mock
+    from quanto import dashboard
+    request, path, _ = desk
+    monkeypatch.setattr(dashboard, "Conversations", Mock(side_effect=AssertionError("No session")))
+    assert not path.parent.exists()
+    code, headers, body = request("/api/snapshot-status")
+    report = json.loads(body)
+    assert code == 200 and report["status"] == "never_started"
+    assert report["interval_seconds"] == 300
+    assert report["last_success_at"] is None and report["next_attempt_at"] is None
+    assert datetime.fromisoformat(report["server_time"]).tzinfo is not None
+    assert "Set-Cookie" not in headers and headers["Cache-Control"] == "no-store"
+    assert not path.parent.exists()
+    assert request("/api/snapshot-status", headers={"Host": "example.com"})[0] == 403
+
+
+def test_snapshot_route_returns_recorded_metadata_without_private_capture(desk, status):
+    from quanto.snapshots import capture_due
+    request, path, _ = desk
+    write_status(path, status)
+    now = datetime.now(timezone.utc).timestamp()
+    observed = datetime.fromtimestamp(now, timezone.utc).isoformat()
+    service = {"schema_version": 1, "service": "quanto", "checked_at": observed,
+               "service_state": "healthy", "reason": "health_ok", "readiness_state": "ready",
+               "readiness_reason": "readiness_ok"}
+    (path.parent / "operations.json").write_text(json.dumps(service))
+    capture_due(path.parent.parent, service, now=now)
+    code, headers, body = request("/api/snapshot-status")
+    report = json.loads(body)
+    assert code == 200 and report["status"] == "current"
+    assert report["last_success_at"] == observed
+    assert report["source_observed_at"] == status["observed_at"]
+    assert "latest_capture" not in report and "agents" not in report and "history" not in report
+    assert "Set-Cookie" not in headers
+    assert not any(path.parent.glob("*.sqlite*"))
+
+
+def test_snapshot_route_reports_corrupt_metadata_without_leaking_contents(desk):
+    from quanto.snapshots import STATE_FILE
+    request, path, _ = desk
+    path.parent.mkdir()
+    (path.parent / STATE_FILE).write_text('{"private_fixture": "do not disclose"}')
+    code, _, body = request("/api/snapshot-status")
+    report = json.loads(body)
+    assert code == 200 and report["status"] == "error"
+    assert report["last_success_at"] is None and report["next_attempt_at"] is None
+    assert b"do not disclose" not in body
+
+
 @pytest.mark.parametrize("raw", [b"{", b"[]", b"\xff", b'{"schema_version": 2}', b"x" * (MAX_STATUS_BYTES + 1)])
 def test_malformed_or_oversize_snapshot_reports_invalid(desk, raw):
     request, path, _ = desk

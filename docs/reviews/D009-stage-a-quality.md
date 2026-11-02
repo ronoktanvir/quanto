@@ -1,0 +1,99 @@
+# D009 Stage A: independent execution-quality review
+
+**The corrected candidate passes18 focused synthetic tests and is ready for the lead's separate actual provision/canary attempt, subject to the independent critic and scope dispositions.** This review validates the bounded software path; it does not establish that a Runpod resource exists, that its S3 service accepts these requests, that actual billing matches the estimate, or that project data can be recovered.
+
+Reviewer: `/root/d009_stage_a_quality`, independent of the Stage A producer and critic. Tests used temporary synthetic configuration/state, injected HTTP/S3 responses and local age processes. No real `.env`, account record, private financial data, model response or research database was read. No network, paid model, provisioning, upload, deletion or financial study was executed. A process-wide socket guard made accidental Python network connection attempts fail.
+
+## Exact reviewed identities
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Corrected `runtime/runpod/stage_a.py` | `d5371dd9e4b3618229c3c1e2bcf48944bf2f2464175e2130b4e68f67bc847156` |
+| `scripts/configure_runpod_s3.py` | `f2ca9b81d32a49e78bf5c847b992ac57e4b1cbecffab6d50a159622506bfcb5f` |
+| Independent `runtime/runpod/quality_probe.py` | `ac44ee6f0206ac5dcf15fd544a39df5a4d787a0c93ea58a1b4a5cb82f3e4748c` |
+| Final retained test output | `b86d70dc661b8ded8218a35cd351a9cdb89573f8db54ad78d06a741fb18c1853` |
+| Accepted D009 policy inspected | `68eea41a20a171681e53368b98954fefa8e65e7513ec21b6dc482dfc25851c61` |
+
+The final suite passed under Python3.13.12 in0.277seconds; all three inspected Python files pass Ruff0.17.3. The source hash was checked before and after execution. The local encryption binary reports age1.3.2. This standalone standard-library harness has no installed Quanto dependency; no clean-install claim is made.
+
+## Executed checks and their implications
+
+- **Credential configuration:** existing unrelated settings and comments remain, duplicate targeted assignments collapse to one, new files use mode0600, and temporary files are removed. Empty, oversized, quoted, whitespace and NUL-containing inputs refuse without changing the original. Symlinks, directories, FIFOs, oversized files and invalid UTF-8 refuse. A simulated atomic-replace failure preserves the original and cleans the temporary file. Hidden-input warning, EOF and interruption do not echo values or save credentials; a nonignored destination refuses before prompting. These checks used only invented keys in temporary files.
+- **One creation and conservative failure:** the retained intent and dispatch marker exist before the injected POST; exact10GB/ STANDARD/US-WA-1 properties and a subsequent GET must agree. Existing inventory prevents creation. A lost creation response retains uncertainty and permits no second request through rerunning the command. A second lock acquisition refuses. The tested API boundary rejects Pod routes and deletion methods.
+- **Provider evidence:** the corrected raw-response path retains exact whitespace and optional provider fields before reducing the selected volume properties. It also retains an observed503 response/status and a malformed201 response before refusing them. Files are private; metadata contains no authorization headers. The critic's earlier missing-exact-response finding is therefore closed by independently exercised behavior, not merely a changed report.
+- **Transport and account controls:** HTTP, alternative hosts, authority suffixes, userinfo and alternate ports refuse. The opener disables proxies and redirects and uses a hostname-checking certificate-required TLS context. Oversized bodies and reflected credential values refuse. Invented wrong-account, insufficient-credit, short-runway and nonfinite balance/rate cases refuse; the accepted fixture reports the USD5 floor and90-day runway requirement.
+- **Signature interoperability:** three independently constructed HEAD/GET/PUT requests match the official AWS CLI-bundled botocore SigV4 implementation byte-for-byte in their authorization headers at a fixed timestamp. The PUT comparison includes the actual `application/octet-stream` header. These are synthetic keys and no network requests.
+- **Encrypted transfer behavior:** real local age generates temporary identities, encrypts a synthetic nonce and rejects the wrong key. Injected S3 performs only HEAD/PUT/HEAD/GET. Download length/hash and authenticated plaintext equality pass; corrupted readback refuses. A timed-out PUT remains uncertain and cannot be repeated through the command. Temporary canary identities disappear with their private directory. Results explicitly keep `project_data_uploaded=False` and `project_backup_accepted=False`.
+
+## Preserved preparation history
+
+The initial17-test pass applied to candidate`813fd89b003247a6620481ec218c53cdb5ae25f8cf254a49c72b17820cc8f08e`. Before that pass, my probe used a clock helper absent from the bundled botocore version, then omitted the candidate's PUT content-type from its reference request. Those two probe failures and their outputs remain retained; both were fixture errors, not product findings. The probe was corrected to use that version's clock API and compare the actual signed header set.
+
+The separate critic then reproduced that the candidate retained only a creation projection and response hash. The producer added bounded, credential-checked exact-body capture and status metadata. I inspected that delta, added exact-body/error-response cases and reran the focused suite against the corrected hash above. The final18-test pass supersedes the earlier candidate's acceptance. Neither preparation attempt accessed a real account or rewrote an actual outcome.
+
+## Remaining acceptance limits
+
+Actual creation, exact remote identity, provider HTTP behavior and the encrypted S3 round trip remain lead-executed evidence. The implementation's role is to refuse ambiguity; it does not automatically reconcile an uncertain create or PUT. Broad credential authority and the trusted-account/provider assumption remain unchanged. The canary is retained remotely, but its ephemeral decryption identity is intentionally discarded; it is not a project backup or permanent recovery key.
+
+The source records cost-review deadlines and conservative preflight credit requirements. It does not itself install the recurring cost check, prove a first billed charge or enforce a provider lifetime USD50 cap. The lead must complete and observe those separate controls before describing the resource as managed. Real project snapshots, off-Mac key/account recovery, isolated restore, trusted freshness and unattended research remain later D009/D008 gates. No numerical strategy validation, R14 completion, paid retry or live authority follows from this review.
+
+
+## Public credential-helper regression subset
+
+At the lead's request, the existing credential-helper subset was retained as `tests/test_configure_runpod_s3.py` (SHA-256`3e63c81fa501aedf45c9b312c22f54545b93784300f0c123bddefd228518f6a5`). Its6 tests and16 subtests pass under pytest in0.03seconds, with Ruff passing. They use only temporary synthetic files and patched hidden prompts; the actual configuration file is never read. This retains useful public regression coverage without publishing the private account-bound provisioning harness. The reviewed helper and harness hashes are unchanged.
+
+## V2 identifier correction: independent quality completion
+
+**The v2 candidate passes the bounded quality check for the separate first actual creation attempt, subject to the independent critic and scope dispositions.** The change accepts the S3 access-key identifier when it appears as a legitimate account identifier while continuing to reject the management API key and S3 secret access key in responses. This is software evidence of kind `synthetic_fixture`; it is not evidence that a volume exists or that an actual canary, billed charge, project backup or restore succeeded.
+
+Reviewer `/root/d009_v2_quality_finish` completed the predecessor's bounded quality work after a model-capacity interruption. That interruption was not a product or test failure. The retained predecessor output records 15 passing tests in 0.786 seconds; I inspected its probe and output, then directly reran only the three identifier/reflection/history tests, which passed in 0.044 seconds with exit 0. The original report, v1 source and predecessor output remain preserved. A local `shasum` command failed during its locale initialization; Python hashing then established the identities below. No failed product check is inferred from that utility issue.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| V2 `runtime/runpod/stage_a_v2.py`, before and after the focused execution | `37ccc56c1b2f4b0949a21bce0137fdf9015d36a1d1387616458ad9cd23c09b05` |
+| Preserved v1 `runtime/runpod/stage_a.py` | `d5371dd9e4b3618229c3c1e2bcf48944bf2f2464175e2130b4e68f67bc847156` |
+| Independent `runtime/runpod/quality_probe_v2.py` | `99bbc4fb94034267df156bcb59c43976c28d1d184e59ac0c7c3ddd00e5809399` |
+| Retained 15-test stderr | `b3f3adb18d1d3bbbf34940df6e8ef53e9b39c8f52be4ab27ba95e72dd68b9a93` |
+| New focused 3-test stderr | `7e6d5c46b643a58e94638cecb07ba2cde0a34822ee38798f92aff5f7373dc31b` |
+
+Both retained and new stdout files are empty, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. The new evidence is retained in `runtime/runpod/quality-probe-v2-finish.stdout.txt` and `.stderr.txt`. The accepted policy inspected remains `68eea41a20a171681e53368b98954fefa8e65e7513ec21b6dc482dfc25851c61`.
+
+The direct checks used invented credentials, temporary state and injected HTTP responses with a process-wide Python socket guard. An account identifier equal to the invented S3 access-key ID is accepted without stdout/stderr output; the account projection contains its pinned hash and omits the identifier. A bounded private creation-response capture may retain that public identifier and remains mode 0600. The S3 response path also accepts it. Each actual-secret category, represented only by an invented test value, refuses through management and S3 response paths on both successful and HTTP-error responses, before raw-response/metadata capture or output. A synthetic v1 refusal file remains byte-identical while the v2 lock writes to its separate `stage-a-v2` directory.
+
+The exact v1-to-v2 source diff changes the state-directory name and the reflected-value tuple, adds the two-secret helper and explains the identifier distinction. Endpoint/method allowlists, timeouts and response limits, TLS/redirect policy, resource properties, budget/credit preflight, one-attempt behavior, create/PUT uncertainty, encryption and canary acceptance flags are unchanged in that diff. The retained 15-test output additionally covers one exact creation and rerun refusal, ambiguous creation/PUT, existing inventory, locks, private exact-body capture, endpoint/method and response bounds, account/credit/runway refusal, three botocore signature comparisons, local age round trip/wrong-key refusal and corrupt readback. These checks do not certify provider behavior or a provider-enforced lifetime spending cap.
+
+I did not read `.env`, actual account responses, private databases, financial data or model responses, and made no actual network, provisioning, upload, deletion or paid-model call. The lead reports that the old actual refusal occurred before creation; this review does not independently inspect that actual receipt or infer that all refusals are safe to repeat. The separate v2 path is appropriate here only with the lead's confirmed pre-create/no-mutation disposition and the other independent reviews. All earlier Stage A acceptance limits and later recovery/scheduling gates remain in force.
+
+## V3 canary-only correction: independent quality
+
+**The canary-only v3 candidate passes eight focused independent synthetic tests and is ready for the lead's separate first actual PUT attempt, subject to the critic and scope dispositions.** This acceptance concerns the pinned existing destination and a distinct reviewed canary attempt. It grants no volume-creation capability and establishes no actual upload, provider interoperability, backup or recovery result.
+
+Reviewer `/root/d009_v2_quality_finish` inspected the exact v2-to-v3 source diff and the producer's synthetic probe, then wrote and executed a separate focused quality probe. All eight tests passed in 0.330 seconds, exit 0. Test state and credentials were invented, HTTP/S3 were injected, local age performed the encryption/decryption, and a process-wide Python socket guard blocked accidental connections. No actual `.env`, account/creation/canary receipt, private database, financial data or model response was read, and no actual network, provisioning, upload, deletion or paid-model call occurred.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `runtime/runpod/stage_a_v3_canary.py`, before and after execution | `38880a7e8b97a1ebaccaf5c9012b4b879f3d0bf81098f2c2a82cbbdf1e2230df` |
+| Independent `runtime/runpod/quality_probe_v3.py` | `caf089881e361a276d489db7e62fa8f156c14fc14b53c936a8d6117b15a5ed7f` |
+| Retained `runtime/runpod/quality-probe-v3.stderr.txt` | `ec87fdc8dcf6d4f0d153922ee7925e201201babe30c716374066773c014dff6a` |
+| Retained empty `runtime/runpod/quality-probe-v3.stdout.txt` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+The tested controls establish the following bounded results:
+
+- **Destination and predecessor evidence:** a matching synthetic receipt is accepted; changing its bytes refuses at the pinned digest. The source identity remains pinned to the reviewed v2 hash. A predecessor PUT marker or canary result, including a dangling symlink, refuses. Prior possible-PUT state, a numeric zero substituted for Boolean false, a crossed object key and a different attempt volume all refuse. The source also requires the exact accepted account, endpoint, size, tier, region, name format and source identity before the fresh GET.
+- **No new capacity:** no `provision` function exists. The API wrapper and low-level transport both refuse volume creation, deletion, inventory listing and an arbitrary GraphQL mutation. The CLI rejects `provision` before accessing credentials. Its management transport permits only the exact account query and a volume GET; S3 remains limited to exact-region HEAD/PUT/GET paths.
+- **Transport identity and exclusion:** the descriptive `quanto-recovery/0.1` User-Agent appears on the five tested management/S3 request types. V3 obtains the existing v2 lock and its separate v3 lock; either held lock blocks another invocation. All synthetic v2 files remain byte-identical after the tested canary outcomes. The v3 diff retains bounded timeouts/responses, TLS verification, disabled proxies/redirects and the actual-secret reflection guard, while additionally refusing query strings and restricting management operations at the transport boundary.
+- **Canary effects and verification:** local age encrypts the fixed synthetic marker plus nonce, rejects the wrong key and decrypts matching readback. Injected S3 follows HEAD/PUT/HEAD/GET, with the durable PUT marker present before the single PUT. An absence-check 403 refuses with no PUT marker or PUT. A lost PUT records possible mutation and no retry; another invocation makes no S3 call. Corrupted readback refuses. Temporary identities disappear, and success retains `project_data_uploaded=False`, `project_backup_accepted=False` and `ephemeral_identity_retained=False`. Three HEAD/GET/PUT authorization headers match the independent botocore reference signer; the User-Agent is outside the signed-header set.
+
+The actual preceding events are lead-attributed, not independently inspected here: the v2 volume was successfully created and verified with 10GB STANDARD in US-WA-1; its retained provision receipt hash is `ed87c3480170b09b67f72e8a4f5b66a7c7c6e7f77199502a90e9794d445e5fff`, which v3 pins. The lead reports that the v2 canary stopped on an absence-check 403 before PUT, with no PUT marker; a separate AWS CLI read returned 404, a custom GET returned Cloudflare 1010, and adding the descriptive application User-Agent to custom HEAD returned 404. Those observations motivate the transport correction but do not establish that the actual encrypted round trip will succeed. The original actual failure remains preserved and is not rewritten as success.
+
+No broad project retest was required for this isolated canary controller. Actual exact-key ciphertext length/hash, authenticated plaintext equality, remote retention and truthful cost evidence remain lead-executed acceptance work. The provider's response can still refuse, and an uncertain PUT must remain uncertain pending read-only reconciliation. Stage B capture, external key custody, isolated restore, managed cost monitoring, trusted freshness, unattended research and live authorization remain outside this acceptance.
+
+## Post-execution audit of the approved safe projection
+
+**The approved safe projection is consistent with the frozen v3 controller's successful synthetic-canary result.** Reviewer `/root/d009_v2_quality_finish` independently read only `runtime/runpod/stage-a-actual-safe-evidence.json`, the frozen v3 source and this public report for this audit. The projection SHA-256 is `477bfb9779fbeebcdace1b671c7e83895640d468c1dcab4dbfef6802f624ab2c`; the source remains `38880a7e8b97a1ebaccaf5c9012b4b879f3d0bf81098f2c2a82cbbdf1e2230df`. No network or canary rerun occurred, and no actual full receipt, account response, credential file, private database or other private runtime record was inspected.
+
+The independently observed projection reports `status=verified`, kind `synthetic_encrypted_canary`, timestamp `2026-11-02T11:26:12.447810+00:00`, 267 ciphertext bytes and ciphertext SHA-256 `140f6dc4332389d99c219ef995762b013025c20e4154fc6e20a9e7ca34b8cebc`. It reports plaintext equality, wrong-key refusal and remote canary retention as true; project-data upload, project-backup acceptance and retention of the ephemeral identity are false. Its recorded stderr length is zero. The projection identifies full canary-receipt SHA-256 `fedb7b568d2ea28e22bcfc5004e3cced01d444d56ec096a8a3b02db58b6e5b3d`; that is an observed projected identity, not an independently rehashed full receipt.
+
+Read-only consistency checks passed: the projection's source hash, descriptive User-Agent and pinned v2 source/provision-receipt identities match the frozen source constants; the fixed result fields and exact Boolean types match the source's success result. Source inspection confirms that a verified result is constructed only after PUT status 200, matching remote length, exact downloaded ciphertext length/hash, authenticated decryption and plaintext equality; wrong-key refusal also precedes the upload. This source/result agreement supports accepting the projected metadata without claiming an independently repeated remote transfer or independently verifying the projection's derivation from the full receipt.
+
+The root reports executing v3 once successfully at that timestamp with exit 0 and empty stderr. Execution count and exit status remain root-attributed because the safe projection does not independently establish them. The earlier v1 refusal and v2 pre-PUT canary failure remain historical failures; the later success does not erase them. The evidence is an actual infrastructure transfer of `synthetic_fixture` bytes, not historical-market, paper or live-trading evidence. Together with the earlier independent software checks, it supports the bounded Stage A canary outcome reported by the lead. It does not establish project recovery, production key custody, isolated restore, billed charges, observed recurring monitoring, trusted freshness, unattended research, R14 completion or live authority.

@@ -1,5 +1,35 @@
 # Resume here
 
+## Current checkpoint: storage and encrypted canary verified
+
+Root executed the frozen canary-only v3 exactly once at 2026-11-02T11:26:12.447810Z. Exit 0, empty stderr, 267-byte ciphertext matched after HEAD/GET and decrypted to the original synthetic bytes; wrong key refused. No project data uploaded and project_backup_accepted remains false. Do not run any provisioning or canary command again. One 10 GB STANDARD US-WA-1 volume already exists; no additional resource is needed.
+
+V3 source SHA `38880a7e8b97a1ebaccaf5c9012b4b879f3d0bf81098f2c2a82cbbdf1e2230df`; private receipt `runtime/runpod/stage-a-v3/canary-result.json` SHA `fedb7b568d2ea28e22bcfc5004e3cced01d444d56ec096a8a3b02db58b6e5b3d`. Approved reviewer projection `runtime/runpod/stage-a-actual-safe-evidence.json` SHA `477bfb9779fbeebcdace1b671c7e83895640d468c1dcab4dbfef6802f624ab2c`. Separate post-execution quality inspected that projection and source only; actual execution remains root-attributed. All old refusals and sources remain preserved. The public actual report is docs/reviews/D009-stage-a-actual.md.
+
+Private monitor-config now pins the accepted canary path/hash, retaining project_backup_accepted=false. Daily 09:00 local heartbeat is registered ACTIVE; no future scheduled execution or first posted charge has been observed. Existing credit funded the roughly USD 0.70/month before-tax storage, with no top-up or compute. USD 50 cumulative allowance is not a provider-enforced cap. Billing review deadline November 5 11:06:23Z; cost review December 2 11:06:23Z. Mac/app availability required for local checks.
+
+Branch feat/runpod-recovery follows merged PR10; c55dcfa records D009 policy/council,1059f63 adds the S3 credential helper. Stage A execution/review/context evidence is being integrated. The builder is preparing scripts/configure_backup_key.py, its tests and docs/BACKUP_KEY_SETUP.md; no permanent key has been generated. Complete independent helper checks before user setup. Stage B still needs off-Mac key/account recovery, reviewed consistent capture and source rights, plus isolated downloaded restore. No automatic research retry or new model call; the D008 third workflow remains invalid despite its passed numerical audit.
+
+The following sections are preserved historical checkpoints. Where their pending-state wording conflicts with this current section, use the dated current section and retained evidence.
+
+## Actual Runpod volume created; canary compatibility correction pending
+
+Reviewed v2 provision ran once and succeeded at2026-11-02T11:06:25.659093UTC: one10GBSTANDARDUS-WA-1 volume, freshGETverified. Exact private provision-result.json SHAed87c3480170b09b67f72e8a4f5b66a7c7c6e7f77199502a90e9794d445e5fff under runtime/runpod/stage-a-v2. Do NOT create another volume. No new creditdeposit. USD0.70/monthbeforetaxestimate;50totalauthorization remains distinct from modelbudgets.
+
+V2canary then refused beforePUT: canary_key_not_proven_absent, put_may_have_occurred=false, no put-dispatched marker. Rootreadonlyreconciliation: customHEAD403, AWSCLIexactkeyHEAD404. CustomGET returned Cloudflare error1010; an explicitly descriptive User-Agent quanto-recovery/0.1 on otherwise samecustomsignedHEAD returned404. OfficialCloudflare1010docs explicitly recommenddescriptiveapplicationUA ratherthan defaulturllib. This is not browserimpersonation. Allfailedreceiptsremain; no syntheticpayload orprojectdata uploaded yet. Builderprepares NEWcanary-onlyv3 preservingv2, pinnedexistingreceipt/sourcehash, exactfailedprePUTevidence andfreshidentityGET. It musthave NOnewvolumePOST/provisioncommand. Critic/quality/scope checks precede firstPUT.
+
+InitialbillingGETomittedendTime andreturned400; correctedstart+endquery returned200with0records at11:15:11UTC, billingnotyetobserved, taxunverified. Bothreadsretained inruntime/runpod. Daily9AMlocalheartbeat quanto-storage-health-and-budget createdACTIVE viaappautomation tool. It reads private monitor-config.json, samepinnedvolume andcredit/billing, onlyread-onlyS3ifacceptedcanaryreceiptprovided. Firstbillingdeadline2026-11-05T11:06:23.375760UTC;30dayreview2026-12-02T11:06:23.375760UTC. RunsrequireMac/appavailable; noproviderlifetimehardcap. Notifyonlymeaningfulchange/action. Appautomationdoesnotauthorizeuploads/resources/deletion/researchreplay. Monitorconfig accepted_canary_receipt=null/project_backup_accepted=false until actualevidence.
+
+Nativev2critic/qualityhitmodelcapacityafterpreparingchecks; replacementboundedSolreviewers inspectedretainedchecks andcompletedreports, preservingthatcapacityinterruption. Finalv2criticreport1e0d77dd..., quality572cc12..., scopef90c0f0.... Actualprovisionhadthosefinalcriticism/qualitychecks plusconditionalscopeclearance; finalscopeappend followedimmediately. Fullgoalactive, no strategyvalidation/trading.
+
+
+## Stage A first preflight refusal — preserved
+
+The first reviewed provisioning command stopped at credential_reflected during the read-only account preflight. runtime/runpod/stage-a/provision-failure.json records creation_may_have_occurred=false and no create-dispatched marker exists. No volume or PUT was sent and no charge began. Root compared identifiers privately: Runpod's S3 access-key ID equals the returned account identifier; neither the management secret nor S3 secret equals it. The original detector incorrectly classified that expected identifier as a secret reflection. No secret was printed.
+
+Original harness d5371dd9e4b3618229c3c1e2bcf48944bf2f2464175e2130b4e68f67bc847156 and receipts stay unchanged. New stage_a_v2.py SHA37ccc56c1b2f4b0949a21bce0137fdf9015d36a1d1387616458ad9cd23c09b05 uses stage-a-v2 and distinguishes the public access identifier from both actual secrets. Producer15 synthetic tests and3 reference signer comparisons pass; independent critic/quality rechecks are pending before a new explicitly reviewed first create. Do not rerun the consumed original command or claim an actual storage resource exists yet.
+
+
 ## Git integration and storage design checkpoint
 
 PR10 merged as a6184238b89c7180b82f8fa2af4b40043f514a02 after Checks41430727555 succeeded on exact head449b4a1621bdac25a34acdc6f236895eb92dbdcf. Current branch feat/runpod-recovery is fast-forwarded to that merge. The isolated prompt worktree is clean with only expendable test caches, but archive_worktree refused because another active task still uses it; leave it attached rather than bypassing ownership.

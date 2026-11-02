@@ -1,20 +1,50 @@
 # Quanto
 
-Quanto is a private, local-first quantitative research operation under construction. Its intended workflow connects bounded research agents to versioned data, deterministic backtests, independent review, and a permanent record of experiments and failures. A separate execution service is planned after research and operational gates pass.
+Quanto is a private quantitative research desk under construction. It combines deterministic calculations, recorded experiments, independent criticism, and a local interface for understanding the work. A separate trading service is planned after research and operational checks.
 
-**Current state:** governance and engineering foundation being established. No strategy is validated, no external-model review has run, and no trading service is active.
+**Current state:** the synthetic research engine, evidence/budget journal, interactive dashboard, contextual assistants, and local website supervisor exist. Actual Opus reviews have run. Real-data research, protected holdouts, persistent research roles, paper trading, and live execution remain incomplete. No strategy is validated and nothing is trading.
+
+## Run locally
+
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/). From this repository:
+
+```sh
+uv sync --extra dev --locked
+PYTHONPATH=src .venv/bin/python -m quanto demo
+PYTHONPATH=src .venv/bin/python -m quanto status
+PYTHONPATH=src .venv/bin/python -m pytest -q
+.venv/bin/ruff check .
+```
+
+The demo runs synthetic prices through the actual engine and journal. Its results test software, not investment performance. Local records are ignored under `runtime/` and `artifacts/`.
+
+The operator dashboard reads an explicit `runtime/status.json` observation snapshot. It refuses missing or invalid snapshots instead of inventing progress. With a recorded snapshot present, start it with:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m quanto serve --port 8766
+```
+
+Open [the local desk](http://127.0.0.1:8766/). For macOS background supervision, inspect and install the project-owned LaunchAgent using the commands in [Operations](docs/OPERATIONS.md). Keep the project downloaded if its directory is synchronized with iCloud. Sleep, shutdown and logout interrupt local operation; this is not hosted 24/7 infrastructure.
+
+## Conversations and costs
+
+Specialist conversations use new Haiku contextual assistants, while the desk helper uses Opus. Both answer from a bounded selection of saved project evidence. They cannot execute commands or trade. A separate worker inbox records questions for the actual original workers; replies require the lead to route the question and record a real answer with provenance.
+
+Set `ANTHROPIC_API_KEY` only in the ignored local `.env` copied from `.env.example`, and restrict that file to its owner (`chmod 600 .env`). Never put keys in chat or committed files. Chat remains unavailable without this credential. The models are pinned to `claude-haiku-5-5` and `claude-opus-5-5`, with no silent fallback.
+
+Cooperating Quanto requests share a USD 20 per America/Los_Angeles day ceiling. Reservations include uncertain calls and prohibit automatic paid retries. Conversations have a separate USD 18 conservative allowance; incident diagnosis is limited to USD 0.50. Healthy website checks cost nothing. UI amounts are conservative usage estimates, not invoices, and unrelated clients of the same API account are outside this ledger. No subscriptions are purchased.
 
 ## Project records
 
-- [Context](docs/CONTEXT.md): objective, constraints, and current assumptions.
+- [Context](docs/CONTEXT.md): objective and confirmed constraints.
 - [Status](docs/STATUS.md): verified progress and open issues.
-- [Requirements](docs/REQUIREMENTS.md): full completion criteria and evidence.
-- [Roadmap](docs/ROADMAP.md): implementation sequence without reducing the final objective.
-- [Decisions](docs/DECISIONS.md): options, independent perspectives, and conclusions.
-- [Handoff](docs/HANDOFF.md): where the next work session should resume.
+- [Requirements](docs/REQUIREMENTS.md): complete outcome and evidence requirements.
+- [Roadmap](docs/ROADMAP.md): work still needed.
+- [Decisions](docs/DECISIONS.md): reasoning, outside criticism and dispositions.
+- [Design](docs/DESIGN.md): interface behavior and evidence boundaries.
+- [Operations](docs/OPERATIONS.md): service controls and recovery limits.
+- [Handoff](docs/HANDOFF.md): continuation checkpoint.
 
-## Public release boundary
+## Repository boundary
 
-This repository is initially private. It will contain reusable code, documentation, and synthetic test fixtures. Credentials, market-data archives, personal strategies, portfolios, and runtime research records stay outside version control. Future publication requires a separate license choice and history/content review.
-
-Synthetic demonstrations are engineering evidence. Historical simulations are conditional on their recorded data and assumptions. Neither establishes future profitability.
+The repository remains private. Reusable code, documentation and synthetic tests belong here; credentials, licensed data, private strategies, portfolios, conversations and runtime records do not. A future public release requires a deliberate license choice and history/content review. See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md).

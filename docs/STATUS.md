@@ -1,6 +1,6 @@
 # Current status
 
-The complete private operation remains under construction. Current stage: US-first data acquisition, provenance and registered exploration. The first private Alpaca download succeeded. No strategy is validated and nothing is trading.
+The complete private operation remains under construction. Current stage: implementing historical-data admission and split/dividend accounting after the verified US-first provenance increment. The first private Alpaca download succeeded. No strategy is validated and nothing is trading.
 
 ## Repository and verified foundation
 
@@ -28,4 +28,8 @@ Registered exploration records exact inputs, code identities, candidate/retry co
 
 ## Required next work
 
-After PR #3's remote checks and merge, implement historical-data admission and corporate-action accounting, protected final-evaluation access, actual five-role research, searchable failure retrieval, durable unattended research scheduling, prospective paper trading, and separately credentialed execution with explicit owner activation. Crypto follows the initial US workflow under separately reviewed source terms. The D004 per-adviser archive gap remains explicit; no review quotations should be invented to fill it.
+PR #3 passed its final GitHub checks and merged as `fffc374`. D006 now addresses historical-data admission and corporate-action accounting. Protected final-evaluation access, actual five-role research, searchable failure retrieval, durable unattended research scheduling, prospective paper trading, and separately credentialed execution with explicit owner activation remain required. Crypto follows the initial US workflow under separately reviewed source terms. D004's original adviser messages have been recovered and verified against the source conversations.
+
+## D006 in progress
+
+Five design perspectives and actual Opus criticism are archived. The accepted policy fixes dividend share basis, session ordering, exact signal comparisons, Decimal accounting, relevance/conflict rules and terminal marking before new market acquisition. Three producers are implementing event accounting, action collection and evidence-bound admission. Independent implementation, quality and scope checks and the actual historical split/dividend pilot remain pending. The outside-review ledger currently records $0.977854 for nine settled project requests, with no outstanding holds.

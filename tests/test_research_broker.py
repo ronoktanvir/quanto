@@ -94,6 +94,11 @@ def test_complete_real_composition_fresh_suite_and_no_private_context(tmp_path, 
         aliases = {}
         for stage in result["stages"]:
             observation = store.read_json(stage["method_verification_sha256"])
+            failure = store.read_json(observation["failure_context_sha256"])
+            context = next(c for c in model.contexts if c["role"] == stage["role"])
+            assert failure["failures"] == context["failures"]
+            assert observation["failure_context_sha256"] not in stage["alias_bindings"].values()
+            assert failure["basis_sha256"] not in stage["alias_bindings"].values()
             assert observation["suite_sha256"] == configuration["suite_sha256"]
             assert observation["configuration_sha256"] == result["configuration_sha256"]
             assert observation["role"] == stage["role"]
@@ -124,6 +129,128 @@ def test_suite_lost_after_first_response_refuses_next_integrity_claim(tmp_path, 
         assert store.list_submissions(kind="research_comparison") == []
         assert store.list_submissions(kind="study_suite_run") == []
         assert len(result["stages"]) == 1
+
+
+def test_historical_relations_are_qualified_without_changing_refusals(tmp_path, configuration):
+    with Provenance(tmp_path) as store:
+        suite = store.read_json(configuration["suite_sha256"])
+        revision = store.read_json(suite["policy_revision_sha256"])
+        old = revision["lineage"]["prior_refusals"]
+        configuration["failure_ids"] = [
+            {"source": "submission", "id": r["submission_id"]} for r in old]
+        before = [store.get_submission(r["submission_id"]) for r in old]
+    model = ModelFixture()
+    result = run_workflow(tmp_path, configuration, transport=model)
+    assert result["status"] == "success"
+    assert model.contexts[0]["failures"] == []
+    for context in model.contexts[1:]:
+        assert len(context["failures"]) == 2
+        for fact in context["failures"]:
+            assert fact["relation"] == "prior_refusal_in_bound_revision"
+            assert fact["status"] == "invalid" and fact["disposition"] == "unresolved"
+            assert fact["disposition_recorded"] is False and fact["provisional"] is True
+            assert fact["disposition_artifact_state"] == "none"
+    with Provenance(tmp_path) as store:
+        assert before == [store.get_submission(r["submission_id"]) for r in old]
+        assert len(store.list_submissions(kind="failure_memory_query")) == 1
+
+
+def test_new_disposition_between_preparation_and_binding_prevents_send(tmp_path, configuration,
+                                                                     monkeypatch):
+    from quanto.failure_memory import FailureMemory
+    original = research_broker._bind_model_packet
+
+    def change_claim(workflow, parent, token, worker, fence, request, packet, proof):
+        if workflow.store.read_json(packet)["role"] == "hypothesis":
+            FailureMemory(workflow.store, allowed_codes=("other_refusal",)).append_disposition(
+                "submission", configuration["failure_ids"][0]["id"], "unresolved",
+                code="other_refusal")
+        return original(workflow, parent, token, worker, fence, request, packet, proof)
+
+    monkeypatch.setattr(research_broker, "_bind_model_packet", change_claim)
+    model = ModelFixture()
+    result = run_workflow(tmp_path, configuration, transport=model)
+    assert result["status"] == "invalid" and len(model.contexts) == 1
+    assert result["error_code"] == "broker_failure_context_refused"
+    with Provenance(tmp_path) as store:
+        assert len(store.list_submissions(kind="failure_memory_query")) == 1
+        assert not store.list_submissions(kind="research_comparison")
+
+
+def test_observation_cannot_bind_two_requests(tmp_path, configuration, monkeypatch):
+    original = research_broker._bind_model_packet
+
+    def bind_twice(workflow, parent, token, worker, fence, request, packet, proof):
+        original(workflow, parent, token, worker, fence, request, packet, proof)
+        original(workflow, parent, token, worker, fence, request + "-again", packet, proof)
+
+    monkeypatch.setattr(research_broker, "_bind_model_packet", bind_twice)
+    result = run_workflow(tmp_path, configuration, transport=lambda *_: pytest.fail("No send"))
+    assert result["status"] == "invalid"
+    assert result["error_code"] == "broker_packet_observation_reused"
+    with Provenance(tmp_path) as store:
+        assert store.journal.connection.execute("SELECT COUNT(*) FROM reservations").fetchone()[0] == 0
+
+
+def test_prior_run_retrieval_cannot_be_rebound_as_fresh_work(tmp_path, configuration, monkeypatch):
+    first = run_workflow(tmp_path, configuration, transport=ModelFixture(stop="hypothesis"))
+    assert len(first["stages"]) == 2
+    with Provenance(tmp_path) as store:
+        old = json.loads(store.journal.connection.execute(
+            "SELECT payload FROM events WHERE kind='workflow_broker_failure_basis_bound'"
+        ).fetchone()[0])["basis_sha256"]
+    monkeypatch.setattr(research_broker, "retrieve_failure_basis", lambda *_: old)
+    model = ModelFixture(stop="hypothesis")
+    second = run_workflow(tmp_path, {**configuration, "run_key": "reject-old-retrieval"}, transport=model)
+    assert second["status"] == "invalid" and len(model.contexts) == 1
+    assert second["error_code"] == "broker_failure_basis_binding_refused"
+    with Provenance(tmp_path) as store:
+        assert len(store.list_submissions(kind="failure_memory_query")) == 1
+
+
+def test_unused_preexisting_retrieval_cannot_count_as_current_effect(tmp_path, configuration,
+                                                                   monkeypatch):
+    from quanto.research_failure_context import retrieve_failure_basis
+    with Provenance(tmp_path) as store:
+        old = retrieve_failure_basis(store, configuration["failure_ids"])
+    monkeypatch.setattr(research_broker, "retrieve_failure_basis", lambda *_: old)
+    model = ModelFixture()
+    result = run_workflow(tmp_path, configuration, transport=model)
+    assert result["status"] == "invalid" and len(model.contexts) == 1
+    assert result["error_code"] == "broker_failure_basis_binding_refused"
+
+
+def test_unused_proof_prepared_before_assignment_is_refused(tmp_path, configuration, monkeypatch):
+    from quanto.research_failure_context import verify_failure_context
+    from quanto.ledger import hash_json
+    model, earlier = ModelFixture(), []
+    original = research_broker._method_verification
+
+    def prepare_early(body, key):
+        response = model(body, key)
+        if model.contexts[-1]["role"] == "hypothesis":
+            with Provenance(tmp_path) as store:
+                config = store.journal.connection.execute(
+                    "SELECT configuration_sha256 FROM research_broker_runs").fetchone()[0]
+                binding = json.loads(store.journal.connection.execute(
+                    "SELECT payload FROM events WHERE kind='workflow_broker_failure_basis_bound'"
+                ).fetchone()[0])
+                earlier.append(verify_failure_context(store, config, "engineer", binding["basis_sha256"]))
+        return response
+
+    def substitute(store, configuration_sha256, role, basis_sha256):
+        digest = original(store, configuration_sha256, role, basis_sha256)
+        if role == "engineer":
+            proof = store.read_json(digest)
+            proof["failure_context_sha256"] = earlier[0]
+            proof["failure_facts_sha256"] = hash_json(store.read_json(earlier[0])["failures"])
+            return store.put_json(proof)
+        return digest
+
+    monkeypatch.setattr(research_broker, "_method_verification", substitute)
+    result = run_workflow(tmp_path, configuration, transport=prepare_early)
+    assert result["status"] == "invalid" and len(model.contexts) == 2
+    assert result["error_code"] == "broker_packet_observation_reused"
 
 
 def test_failed_response_keeps_exact_predispatch_integrity_binding(tmp_path, configuration):
@@ -252,7 +379,7 @@ def test_wrong_failure_id_refuses_before_hypothesis_send(tmp_path, configuration
     model = ModelFixture()
     result = run_workflow(tmp_path, configuration, transport=model)
     assert result["status"] == "invalid" and len(model.contexts) == 1
-    assert result["error_code"] == "broker_failure_missing_or_not_unsuccessful"
+    assert result["error_code"] == "broker_failure_context_refused"
 
 
 def test_child_is_bound_before_execution_and_binding_survives_interruption(tmp_path, configuration, monkeypatch):

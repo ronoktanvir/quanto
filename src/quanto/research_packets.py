@@ -27,6 +27,16 @@ FAILURE_CODES = frozenset({
 FAILURE_STATUSES = frozenset({
     "failed", "invalid", "interrupted", "rejected", "pending", "uncertain",
 })
+FAILURE_ARTIFACT_STATES = frozenset({
+    "none", "not_allowed", "verified", "unavailable", "verification_bound",
+})
+FAILURE_RELATIONS = frozenset({
+    "prior_refusal_in_bound_revision", "no_relation_established",
+})
+FAILURE_FIELDS = frozenset({
+    "alias", "code", "status", "disposition", "disposition_recorded", "provisional",
+    "artifact_state", "disposition_artifact_state", "relation",
+})
 FINDING_CODES = frozenset({
     "method_consistent", "insufficient_evidence", "unsupported_assumption",
     "timing_not_established", "roster_incomplete", "specification_mismatch",
@@ -86,6 +96,24 @@ SYSTEM_PROMPT = (
     "the integrity fact does not require proceeding or executing. Execution state describes "
     "lifecycle only. Do not claim to inspect hidden values, certify data accuracy, establish "
     "significance or infer investment merit. "
+    "A failure's status records its unchanged historical outcome. disposition_recorded=false "
+    "with disposition=unresolved means no disposition claim was recorded; it is not proof "
+    "that the historical refusal still applies. A recorded unresolved or corrected disposition "
+    "is a provisional claim, not a validated repair; provisional is always true. artifact_state "
+    "describes failure evidence bytes in the memory service's approved reference subset, and "
+    "disposition_artifact_state describes the linked disposition evidence bytes. Their states "
+    "mean: none, no linked bytes; "
+    "not_allowed, bytes outside the approved verification set; verified, retained bytes checked "
+    "only; unavailable, bytes unavailable for verification; verification_bound, verification "
+    "limited by its bound. not_allowed does not mean the bytes do not exist. Verified bytes do "
+    "not establish evidence truth, repair efficacy, independent review or completeness of all "
+    "underlying references. "
+    "relation=prior_refusal_in_bound_revision means only that the original refused request is "
+    "an exact member of the currently revalidated revision's retained prior-refusal lineage. "
+    "It does not "
+    "guarantee resolution, current applicability, safety or permission to execute. "
+    "no_relation_established means no such relation was established, not proof of no relation. "
+    "These memory facts do not require proceeding; stop or block for justified method defects. "
     "Return one JSON object with exactly schema_version, role, decision, predicate, "
     "artifact_aliases, findings, rationale. schema_version is integer 1. "
     "Director decision is proceed or stop, with predicate null. Hypothesis decision is propose "
@@ -216,16 +244,32 @@ def validate_packet(value) -> dict:
         raise PacketError("packet_failures_refused")
     checked_failures, failure_aliases = [], set()
     for failure in failures:
-        _object(failure, {"alias", "code", "status", "disposition"})
+        _object(failure, FAILURE_FIELDS)
         alias = _code(failure["alias"], _FAILURE_ALIASES)
         if alias in failure_aliases:
             raise PacketError("packet_duplicate_refused")
         failure_aliases.add(alias)
-        checked_failures.append({
+        disposition = _code(failure["disposition"], {"unresolved", "corrected"})
+        recorded = failure["disposition_recorded"]
+        if (type(recorded) is not bool or failure["provisional"] is not True
+                or (recorded is False and disposition != "unresolved")):
+            raise PacketError("packet_failure_state_refused")
+        checked = {
             "alias": alias, "code": _code(failure["code"], FAILURE_CODES),
             "status": _code(failure["status"], FAILURE_STATUSES),
-            "disposition": _code(failure["disposition"], {"unresolved", "corrected"}),
-        })
+            "disposition": disposition, "disposition_recorded": recorded, "provisional": True,
+            "artifact_state": _code(failure["artifact_state"], FAILURE_ARTIFACT_STATES),
+            "disposition_artifact_state": _code(
+                failure["disposition_artifact_state"], FAILURE_ARTIFACT_STATES),
+            "relation": _code(failure["relation"], FAILURE_RELATIONS),
+        }
+        if (recorded is False and checked["disposition_artifact_state"] != "none"
+                or disposition == "corrected" and (
+                    checked["disposition_artifact_state"] == "none" or checked["status"] == "pending")
+                or checked["relation"] == "prior_refusal_in_bound_revision"
+                and checked["status"] != "invalid"):
+            raise PacketError("packet_failure_state_refused")
+        checked_failures.append(checked)
     result["failures"] = checked_failures
     prior = value["prior_outputs"]
     if type(prior) is not list or len(prior) > 6:

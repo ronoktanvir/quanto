@@ -13,14 +13,16 @@ import re
 import sqlite3
 import uuid
 
-from quanto.failure_memory import FailureMemory
 from quanto.ledger import LedgerError, canonical_json, hash_bytes, hash_json
 from quanto.provenance import Provenance, ProvenanceError, _strict_json
 from quanto.provider import HAIKU, OPUS, _research_ready
 from quanto.research_comparison import completion_projection, run_comparison
 from quanto.research_dispatch import ResearchDispatcher
+from quanto.research_failure_context import (
+    FailureContextError, revalidate_failure_context, retrieve_failure_basis, verify_failure_context,
+)
 from quanto.research_packets import (
-    FAILURE_CODES, METHOD, PREDICATES, SUITE_INTEGRITY, SYSTEM_PROMPT, validate_packet,
+    METHOD, PREDICATES, SUITE_INTEGRITY, SYSTEM_PROMPT, validate_packet,
 )
 from quanto.research_workflow import ROLES, REVIEW_ROLES, ResearchWorkflow
 
@@ -77,7 +79,8 @@ def _schema(store):
 def code_identity():
     """Disk/source identity; cooperating-process control, not owner attestation."""
     names = ("research_broker.py", "research_packets.py", "research_dispatch.py",
-             "research_comparison.py", "research_workflow.py", "failure_memory.py", "provider.py")
+             "research_comparison.py", "research_workflow.py", "failure_memory.py", "provider.py",
+             "research_failure_context.py")
     directory = Path(__file__).parent
     return {"sources": {name: hash_bytes((directory / name).read_bytes()) for name in names},
             "python": platform.python_version(), "implementation": platform.python_implementation()}
@@ -140,30 +143,7 @@ def _aliases(store, run_id, refs):
     return {known[digest]: digest for digest in refs}
 
 
-def _failure_projection(store, allowed):
-    """Retrieve only exact supervisor-authorized IDs; never forward raw metadata."""
-    memory = FailureMemory(store, allowed_codes=tuple(FAILURE_CODES))
-    records, receipts = [], []
-    for source in ("submission", "attempt"):
-        ids = [item["id"] for item in allowed if item["source"] == source]
-        if not ids:
-            continue  # Empty IDs would be an unrestricted query.
-        result = memory.query({"sources": [source], "ids": ids, "limit": 16})
-        receipts.append(result["receipt_sha256"])
-        for record in result["failures"]:
-            if (record["source"], record["id"]) not in {(item["source"], item["id"]) for item in allowed}:
-                raise BrokerError("broker_failure_scope_mismatch")
-            records.append(record)
-    if len(records) != len(allowed):
-        raise BrokerError("broker_failure_missing_or_not_unsuccessful")
-    facts = [{"alias": "failure-" + str(i + 1),
-              "code": record["code"] if record["code"] in FAILURE_CODES else "other_refusal",
-              "status": record["status"], "disposition": record["disposition"]["state"]}
-             for i, record in enumerate(sorted(records, key=lambda r: (r["source"], r["id"])))]
-    return facts, receipts
-
-
-def _method_verification(store, configuration_sha256, role):
+def _method_verification(store, configuration_sha256, role, basis_sha256):
     """Recheck exact local dependencies before asserting a packet integrity fact."""
     from quanto.study_suite import _verified
 
@@ -171,6 +151,8 @@ def _method_verification(store, configuration_sha256, role):
     suite = _verified(store, configuration["suite_sha256"])
     if suite["policy_revision_sha256"] != configuration["verified_policy_revision_sha256"]:
         raise BrokerError("broker_suite_verification_changed")
+    failure_ref = verify_failure_context(store, configuration_sha256, role, basis_sha256)
+    failure = store.read_json(failure_ref)
     return store.put_json({
         "schema_version": 1, "kind": "research_suite_integrity_observation", "role": role,
         "configuration_sha256": configuration_sha256,
@@ -178,7 +160,52 @@ def _method_verification(store, configuration_sha256, role):
         "policy_revision_sha256": suite["policy_revision_sha256"],
         "verified_at": store.journal._stamp(store.journal._now()),
         "method": METHOD, "suite_integrity": SUITE_INTEGRITY,
+        "failure_context_sha256": failure_ref, "failure_basis_sha256": basis_sha256,
+        "failure_facts_sha256": hash_json(failure["failures"]),
     })
+
+
+def _bind_failure_basis(workflow, parent, token, worker, fence, request_id, basis_sha256):
+    """Tie the one authorized retrieval to its original hypothesis effect."""
+    from quanto.policy_revision import _position
+
+    with workflow.journal._transaction():
+        assignment = workflow._leased(token, worker, fence, workflow.journal._now())
+        intent = workflow._intent(assignment, request_id, fence)
+        run = workflow.db.execute(
+            "SELECT * FROM research_broker_runs WHERE submission_id=?", (parent,)).fetchone()
+        started = workflow.db.execute(
+            "SELECT 1 FROM workflow_effect_starts WHERE assignment_id=? AND request_id=?",
+            (assignment["assignment_id"], request_id)).fetchone()
+        prior = workflow.db.execute(
+            "SELECT 1 FROM events WHERE kind='workflow_broker_failure_basis_bound' "
+            "AND (json_extract(payload,'$.parent_submission_id')=? "
+            "OR json_extract(payload,'$.basis_sha256')=?)", (parent, basis_sha256)).fetchone()
+        if (run is None or run["workflow_run_id"] != assignment["run_id"]
+                or assignment["role"] != "hypothesis" or intent["action"] != "query_failures"
+                or not started or prior):
+            raise BrokerError("broker_failure_basis_binding_refused")
+        basis = workflow.store.read_json(basis_sha256)
+        registered = workflow.store.get_submission(basis["submission_id"])
+        effect = workflow.db.execute(
+            "SELECT id FROM events WHERE kind='workflow_effect_started' "
+            "AND json_extract(payload,'$.assignment_id')=? "
+            "AND json_extract(payload,'$.request_id')=? AND json_extract(payload,'$.fence')=?",
+            (assignment["assignment_id"], request_id, fence)).fetchone()
+        if (basis.get("kind") != "research_failure_basis" or registered["kind"] != basis["kind"]
+                or registered["status"] != "success"
+                or registered["details"] != {"context_sha256": basis_sha256,
+                                               "artifact_refs": [basis_sha256]}
+                or registered["request_sha256"] != hash_json(basis["request"]) or effect is None
+                or not effect[0] < _position(workflow.store, basis["submission_id"], "started")
+                < _position(workflow.store, basis["submission_id"], "finished")):
+            raise BrokerError("broker_failure_basis_binding_refused")
+        workflow._leased(token, worker, fence, workflow.journal._now())
+        workflow._event("broker_failure_basis_bound", {
+            "parent_submission_id": parent, "assignment_id": assignment["assignment_id"],
+            "request_id": request_id, "fence": fence,
+            "configuration_sha256": run["configuration_sha256"], "basis_sha256": basis_sha256,
+        }, workflow.journal._now())
 
 
 def _context(role, evidence, aliases, failures, previous, execution, integrity):
@@ -209,12 +236,52 @@ def _bind_model_packet(workflow, parent, token, worker, fence, request_id,
                 or proof.get("method") != packet["method"]
                 or proof.get("suite_integrity") != packet["suite_integrity"]):
             raise BrokerError("broker_packet_verification_mismatch")
+        basis_ref = proof["failure_basis_sha256"]
+        if assignment["role"] == "director":
+            if basis_ref is not None:
+                raise BrokerError("broker_failure_basis_binding_refused")
+        else:
+            rows = workflow.db.execute(
+                "SELECT payload FROM events WHERE kind='workflow_broker_failure_basis_bound' "
+                "AND json_extract(payload,'$.parent_submission_id')=?", (parent,)).fetchall()
+            if len(rows) != 1:
+                raise BrokerError("broker_failure_basis_binding_refused")
+            binding = _strict_json(rows[0]["payload"].encode())
+            completed = workflow.db.execute(
+                "SELECT status FROM workflow_effect_outcomes WHERE assignment_id=? AND request_id=?",
+                (binding["assignment_id"], binding["request_id"])).fetchone()
+            if (binding["configuration_sha256"] != run["configuration_sha256"]
+                    or binding["basis_sha256"] != basis_ref or completed is None
+                    or completed[0] != "success"):
+                raise BrokerError("broker_failure_basis_binding_refused")
+        failure_ref = proof["failure_context_sha256"]
+        observed = revalidate_failure_context(workflow.store, failure_ref,
+                                             run["configuration_sha256"], assignment["role"], basis_ref)
+        if (observed["failures"] != packet["failures"]
+                or hash_json(packet["failures"]) != proof["failure_facts_sha256"]
+                or observed["suite_sha256"] != proof["suite_sha256"]
+                or observed["policy_revision_sha256"] != proof["policy_revision_sha256"]):
+            raise BrokerError("broker_packet_verification_mismatch")
+        issued = workflow.db.execute(
+            "SELECT id FROM events WHERE kind='workflow_assignment_issued' "
+            "AND json_extract(payload,'$.assignment_id')=?", (assignment["assignment_id"],)).fetchone()
+        prepared = workflow.db.execute(
+            "SELECT id FROM events WHERE kind='submission_started' "
+            "AND json_extract(payload,'$.submission_id')=?", (observed["submission_id"],)).fetchone()
+        reused = workflow.db.execute(
+            "SELECT 1 FROM events WHERE kind='workflow_broker_packet_bound' AND "
+            "(json_extract(payload,'$.verification_sha256')=? OR "
+            "json_extract(payload,'$.failure_context_sha256')=?)",
+            (verification_sha256, failure_ref)).fetchone()
+        if issued is None or prepared is None or issued[0] >= prepared[0] or reused:
+            raise BrokerError("broker_packet_observation_reused")
         workflow._leased(token, worker, fence, workflow.journal._now())
         workflow._event("broker_packet_bound", {
             "parent_submission_id": parent, "assignment_id": assignment["assignment_id"],
             "role": assignment["role"], "fence": fence, "request_id": request_id,
             "configuration_sha256": run["configuration_sha256"],
             "packet_sha256": packet_sha256, "verification_sha256": verification_sha256,
+            "failure_context_sha256": failure_ref, "failure_basis_sha256": basis_ref,
         }, workflow.journal._now())
 
 
@@ -352,7 +419,7 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                 store.journal.connection.execute("INSERT INTO research_broker_runs VALUES (?,?,?,?,?)", (
                     submission, config["run_key"], workflow_id, config_ref, hash_json(identity)))
             dispatcher = ResearchDispatcher(workflow)
-            facts, execution = [], "not_requested"
+            execution, basis_ref = "not_requested", None
             projection_refs = {}
             for role in ROLES:
                 if code_identity() != identity:
@@ -369,8 +436,14 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                     workflow.authorize_intent(token, worker, fence, {
                         "request_id": intent_id, "action": "query_failures", "input_refs": assignment["input_refs"]})
                     workflow.start_intent(token, worker, fence, intent_id)
-                    facts, retrievals = _failure_projection(store, config["failure_ids"])
-                    stage_private.extend(retrievals)
+                    basis_ref = retrieve_failure_basis(store, config["failure_ids"])
+                    _bind_failure_basis(workflow, submission, token, worker, fence, intent_id, basis_ref)
+                    stage_private.append(basis_ref)
+                verification_ref = _method_verification(store, config_ref, role, basis_ref)
+                verification = store.read_json(verification_ref)
+                failure_observation = store.read_json(verification["failure_context_sha256"])
+                facts = failure_observation["failures"]
+                if role == "hypothesis":
                     facts_ref = store.put_json({"schema_version": 1, "kind": "approved_failure_facts",
                                                "failures": facts})
                     workflow.finish_intent(token, worker, fence, intent_id,
@@ -380,8 +453,6 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                 aliases = _aliases(store, workflow_id, inputs)
                 # The exact evidence stays private. Only its fixed integrity category
                 # enters the packet; previous stage observations are never reused.
-                verification_ref = _method_verification(store, config_ref, role)
-                verification = store.read_json(verification_ref)
                 stage_private.append(verification_ref)
                 context = _context(role, config["evidence_kind"], aliases, facts, previous, execution,
                                    verification["suite_integrity"])
@@ -463,7 +534,8 @@ def run_workflow(root: Path, request: dict | str, *, transport=None):
                                       "no_unattended_scheduler", "no_protected_evaluator"]}
             return _finish(store, submission, "success" if completed else "invalid", record)
         except (ValueError, OSError, sqlite3.Error, KeyError, TypeError) as exc:
-            code = str(exc) if isinstance(exc, BrokerError) else "broker_stage_refused"
+            code = (str(exc) if isinstance(exc, BrokerError) else "broker_failure_context_refused"
+                    if isinstance(exc, FailureContextError) else "broker_stage_refused")
             try:
                 return _finish(store, submission, "invalid", {
                     "error_code": code, "workflow_run_id": workflow_id, "completed_stages": len(stages),

@@ -1,6 +1,7 @@
 """Synthetic adversarial tests of the fixed D008 method-only packet vocabulary."""
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 
 import pytest
@@ -8,8 +9,8 @@ import pytest
 from quanto.research_packets import (
     FAILURE_ARTIFACT_STATES, FAILURE_CODES, FAILURE_FIELDS, FAILURE_RELATIONS,
     FINDING_CODES, MAX_OUTPUT_BYTES, MAX_PACKET_BYTES, METHOD, PREDICATES,
-    SUITE_INTEGRITY, SYSTEM_PROMPT, PacketError, packet_messages, parse_role_output,
-    project_role_output, validate_packet, validate_projection,
+    ROLE_DECISION_BLOCK, SUITE_INTEGRITY, SYSTEM_PROMPT, PacketError, _DECISIONS,
+    packet_messages, parse_role_output, project_role_output, validate_packet, validate_projection,
 )
 from quanto.research_workflow import ROLES
 
@@ -79,6 +80,158 @@ def test_all_roles_have_fixed_bounded_packets_and_outputs(role):
     parsed = parse(role=role, required=PREDICATE if role in ROLES[2:] else None)
     assert parsed == output(role)
     assert project_role_output(parsed) == {k: v for k, v in parsed.items() if k != "rationale"}
+
+
+def test_fixed_prompt_decision_block_exactly_matches_parser_in_role_order():
+    decisions = json.loads(ROLE_DECISION_BLOCK)
+    assert list(decisions) == list(ROLES)
+    assert decisions == {role: sorted(_DECISIONS[role]) for role in ROLES}
+    assert ROLE_DECISION_BLOCK == json.dumps(decisions, separators=(",", ":"))
+    assert SYSTEM_PROMPT.count(ROLE_DECISION_BLOCK) == 1
+    prompts = [packet_messages(packet(role))["system"] for role in ROLES]
+    assert len({sha256(prompt.encode()).hexdigest() for prompt in prompts}) == 1
+    assert "role must equal the input context's role" in SYSTEM_PROMPT
+    assert "engineer, data_critic, statistical_critic, quality and scope" in SYSTEM_PROMPT
+    assert "including engineer stop and reviewer block or inconclusive" in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize("role,decision", [
+    (role, decision) for role in ROLES for decision in sorted(_DECISIONS[role])
+])
+@pytest.mark.parametrize("predicate", sorted(PREDICATES))
+def test_every_permitted_decision_preserves_supported_predicate_and_decision_freedom(
+        role, decision, predicate):
+    selected = None if role == "director" else predicate
+    candidate = output(role, decision=decision, predicate=selected)
+    checked = parse(candidate, role=role, required=predicate if role in ROLES[2:] else None)
+    assert checked["decision"] == decision
+    assert checked["predicate"] == selected
+    if role in ROLES[3:] and decision == "inconclusive":
+        assert project_role_output(checked)["decision"] == "inconclusive"
+
+
+@pytest.mark.parametrize("predicate", [None, *sorted(PREDICATES)])
+def test_hypothesis_stop_keeps_both_null_and_supported_predicate_forms(predicate):
+    assert parse(output(decision="stop", predicate=predicate))["predicate"] == predicate
+
+
+@pytest.mark.parametrize("role,decision", [
+    (role, decision) for role in ROLES[2:] for decision in sorted(_DECISIONS[role])
+])
+@pytest.mark.parametrize("predicate", [None, "cost_fees_nondecreasing"])
+def test_dependent_roles_cannot_change_predicate_even_when_stopping_blocking_or_inconclusive(
+        role, decision, predicate):
+    with pytest.raises(PacketError):
+        parse(output(role, decision=decision, predicate=predicate), role=role, required=PREDICATE)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_output_role_must_match_exact_context_role(role):
+    other = ROLES[(ROLES.index(role) + 1) % len(ROLES)]
+    with pytest.raises(PacketError):
+        parse(output(other), role=role, required=PREDICATE if role in ROLES[2:] else None)
+
+
+def test_invented_last_role_contract_violation_is_rejected_without_repair():
+    candidate = output("scope", decision="unlisted_scope_decision", predicate=None)
+    original = deepcopy(candidate)
+    with pytest.raises(PacketError):
+        parse(candidate, role="scope", required=PREDICATE)
+    assert candidate == original
+
+
+def test_last_role_schema_refusal_retains_private_partial_history_and_full_hold(tmp_path, monkeypatch):
+    from quanto import provider
+    from quanto.provenance import Provenance
+    from quanto.research_broker import run_workflow
+    from test_research_broker import ModelFixture, configuration
+
+    monkeypatch.setattr(provider, "local_key", lambda _: pytest.fail("No credential access"))
+    # Reuse the existing invented-data factory; no retained runtime/data is read.
+    config = configuration.__wrapped__(tmp_path)
+
+    class ClarificationFixture(ModelFixture):
+        def __call__(self, body, key):
+            response = super().__call__(body, key)
+            candidate = json.loads(response["content"][0]["text"])
+            if candidate["role"] == "data_critic":
+                candidate["decision"] = "inconclusive"
+            if candidate["role"] == "scope":
+                candidate.update(decision="unlisted_scope_decision", predicate=None)
+            response["content"][0]["text"] = json.dumps(candidate)
+            return response
+
+    fixture = ClarificationFixture()
+    result = run_workflow(tmp_path, config, transport=fixture)
+    assert result["status"] == "invalid" and result["review_outcome"] == "incomplete"
+    assert len(result["stages"]) == 6 and len(fixture.contexts) == 7
+    assert result["dispatch_counts"] == {"authorized": 7, "response_observed": 7}
+    with Provenance(tmp_path) as store:
+        critic = next(stage for stage in result["stages"] if stage["role"] == "data_critic")
+        assert store.read_json(critic["projection_sha256"])["decision"] == "inconclusive"
+        row = store.journal.connection.execute(
+            "SELECT h.request_id,h.assignment_id,p.artifact_sha256 FROM research_dispatch_holds h "
+            "JOIN workflow_assignments a USING(assignment_id) "
+            "JOIN research_private_responses p USING(request_id) WHERE a.role='scope'").fetchone()
+        private = store.read_json(row["artifact_sha256"])
+        rejected = json.loads(private["reply"])
+        assert rejected["decision"] == "unlisted_scope_decision" and rejected["predicate"] is None
+        hold = store.journal.connection.execute(
+            "SELECT state,actual_micro_usd FROM reservations WHERE request_id=?",
+            (row["request_id"],)).fetchone()
+        assert hold["state"] == "uncertain" and hold["actual_micro_usd"] is None
+        effect = store.journal.connection.execute(
+            "SELECT status FROM workflow_effect_outcomes WHERE assignment_id=? AND request_id=?",
+            (row["assignment_id"], row["request_id"])).fetchone()
+        assert effect["status"] == "uncertain"
+        assert store.journal.connection.execute(
+            "SELECT COUNT(*) FROM research_dispatch_holds").fetchone()[0] == 7
+    repeated = run_workflow(tmp_path, config, transport=lambda *_: pytest.fail("No retry"))
+    assert repeated["error_code"] == "broker_run_key_already_used"
+
+
+def test_maximum_typed_request_envelope_fits_unchanged_bounds_for_both_models():
+    from quanto import provider
+    from quanto.research_broker import _contracts
+
+    aliases = [f"artifact-{i}" for i in range(1, 33)]
+    prior = [project_role_output(output(
+        role, artifact_aliases=aliases,
+        findings=[{"code": code, "artifact_aliases": aliases}
+                  for code in sorted(FINDING_CODES)[:8]])) for role in ROLES[:-1]]
+    failures = [{**packet()["failures"][0], "alias": f"failure-{i}"} for i in range(1, 17)]
+    largest_structure = packet("scope", artifact_aliases=aliases, prior_outputs=prior,
+                               failures=failures)
+    encoded = json.dumps(largest_structure, sort_keys=True, separators=(",", ":"))
+    # Every permitted packet string is an ASCII code/alias. Only JSON quotation
+    # marks need additional escaping when it becomes the request's content string.
+    maximum_content_escaping = encoded.count('"')
+    candidate = deepcopy(largest_structure)
+    while True:
+        try:
+            rendered = packet_messages(candidate)
+            break
+        except PacketError as exc:
+            assert str(exc) == "packet_size_refused"
+            next(item for item in candidate["prior_outputs"] if item["findings"])["findings"].pop()
+    for model in (provider.HAIKU, provider.OPUS):
+        contract = _contracts({role: model for role in ROLES})["scope"]
+        assert contract["prompt_sha256"] == sha256(SYSTEM_PROMPT.encode()).hexdigest()
+        ceiling = 4096 if model == provider.OPUS else 2048
+        empty = provider.prepare_research_text(
+            model=model, system=SYSTEM_PROMPT, messages=[{"role": "user", "content": ""}],
+            max_tokens=ceiling, max_input_bytes=contract["max_input_bytes"])
+        conservative_body_bound = len(empty.body) + MAX_PACKET_BYTES + maximum_content_escaping
+        assert conservative_body_bound <= contract["max_input_bytes"] == 40_000
+        conservative_hold_bound = ((conservative_body_bound + 65_536) *
+                                   (8 if model == provider.OPUS else 1) +
+                                   (ceiling * 20 if model == provider.OPUS else ceiling * 5 // 2))
+        assert conservative_hold_bound <= contract["max_spend_micro_usd"]
+        prepared = provider.prepare_research_text(
+            model=model, **rendered, max_tokens=ceiling,
+            max_input_bytes=contract["max_input_bytes"])
+        assert len(prepared.body) <= conservative_body_bound
+        assert prepared.reserved_micro_usd <= contract["max_spend_micro_usd"]
 
 
 def test_packet_requires_exact_neutral_method_and_supervisor_integrity_fact():

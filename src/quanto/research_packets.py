@@ -66,6 +66,9 @@ _DECISIONS = {
     "engineer": frozenset({"execute", "stop"}),
     **{role: frozenset({"no_blocking_method_issue", "block", "inconclusive"}) for role in ROLES[3:]},
 }
+ROLE_DECISION_BLOCK = json.dumps(
+    {role: sorted(_DECISIONS[role]) for role in ROLES}, separators=(",", ":"),
+)
 
 # These instructions are program text. Never interpolate model/provider prose.
 SYSTEM_PROMPT = (
@@ -92,7 +95,8 @@ SYSTEM_PROMPT = (
     "financial correctness or investment merit. A false predicate is a valid descriptive result. "
     "You have no prices, dates, instrument identifiers, private results or predicate outcomes. "
     "Missing private values is expected and does not itself establish an incomplete roster "
-    "or a specification mismatch. You remain free to stop or block for justified method defects; "
+    "or a specification mismatch. You remain free to stop or block for justified method defects, "
+    "using the permitted decision for your role; "
     "the integrity fact does not require proceeding or executing. Execution state describes "
     "lifecycle only. Do not claim to inspect hidden values, certify data accuracy, establish "
     "significance or infer investment merit. "
@@ -113,13 +117,24 @@ SYSTEM_PROMPT = (
     "It does not "
     "guarantee resolution, current applicability, safety or permission to execute. "
     "no_relation_established means no such relation was established, not proof of no relation. "
-    "These memory facts do not require proceeding; stop or block for justified method defects. "
+    "These memory facts do not require proceeding; stop or block for justified method defects, "
+    "using the permitted decision for your role. "
     "Return one JSON object with exactly schema_version, role, decision, predicate, "
     "artifact_aliases, findings, rationale. schema_version is integer 1. "
-    "Director decision is proceed or stop, with predicate null. Hypothesis decision is propose "
-    "or stop; propose requires a supported predicate code. Engineer decision is execute or stop. "
-    "Review decisions are no_blocking_method_issue, block or inconclusive. Engineer and reviewers "
-    "must use the predicate selected by the hypothesis prior output. Findings are objects with "
+    "Permitted decision codes by exact role: " + ROLE_DECISION_BLOCK + ". "
+    "role must equal the input context's role. decision must be one of that exact role's listed "
+    "codes; these codes are not interchangeable labels or suggestions. Director predicate is null. "
+    "Hypothesis propose requires one code from allowed_predicates; hypothesis stop may retain "
+    "an allowed code or use null. engineer, data_critic, statistical_critic, quality and scope "
+    "must return the exact predicate code selected by the hypothesis proposal in prior_outputs. "
+    "This applies to every permitted decision, including engineer stop and reviewer block or "
+    "inconclusive. The predicate field names the test being discussed; preserving it does not "
+    "mean the predicate is true, execution is endorsed or the review is favorable. Do not replace "
+    "it with a truth value, conclusion, null, synonym or another predicate. Every permitted "
+    "decision remains available. inconclusive remains available to data_critic, statistical_critic, "
+    "quality and scope. Do not prefer agreement or no_blocking_method_issue because prior stages "
+    "completed, a suite passed integrity checks or a failure appears in a reviewed historical "
+    "lineage. Findings are objects with "
     "exactly code and artifact_aliases; use only the registered finding codes in the next sentence. "
     "Finding codes: method_consistent, insufficient_evidence, unsupported_assumption, "
     "timing_not_established, roster_incomplete, specification_mismatch, hidden_values_unreviewed, "

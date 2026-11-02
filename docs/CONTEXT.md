@@ -33,3 +33,5 @@ The full objective remains active. Credentials and live trading approval are fut
 ## Personal dashboard and diagrams
 
 The owner rejected a company-landing-page appearance. The local interface is a compact personal management workspace, with work and operations first. It must include an interactive milestone dependency diagram that updates from the same recorded progress as the board. Arrows represent recorded prerequisites, not actual inter-agent messages or automatic promotion decisions.
+
+The latest reporting preference is a background status capture every five minutes, with last attempt, last success and countdown to the next attempt displayed. Captures are operational observations, not fabricated updates to native-agent progress. They must continue while the local supervisor runs even if the page is closed.

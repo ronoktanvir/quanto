@@ -74,10 +74,13 @@ def test_once_does_not_launch_or_diagnose(tmp_path, monkeypatch):
     diagnose = Mock(side_effect=AssertionError("must not invoke a model"))
     monkeypatch.setattr(ops, "start_child", start)
     monkeypatch.setattr(ops, "prepare_diagnosis", diagnose)
+    capture = Mock(side_effect=AssertionError("one-shot check must not start a capture schedule"))
+    monkeypatch.setattr(ops, "capture_due", capture)
     state = ops.supervise(tmp_path, 8766, once=True)
     assert state["service_state"] == "healthy_external"
     assert state["restarts"] == 0
     assert state["diagnosis"]["status"] == "not_requested"
+    capture.assert_not_called()
 
 
 class FakeEvent:
@@ -107,6 +110,31 @@ def supervisor_fakes(monkeypatch, checks):
     monkeypatch.setattr(ops, "prepare_diagnosis", Mock(return_value=None))
     monkeypatch.setattr(ops, "check_readiness", lambda _: (True, "readiness_ok"))
     return event
+
+
+def test_supervisor_records_snapshots_without_a_browser_or_model(tmp_path, monkeypatch):
+    from quanto.snapshots import STATE_FILE
+    source = {"schema_version": 1, "observed_at": "2026-10-01T00:00:00+00:00",
+              "project": {"name": "Fixture", "phase": "test", "summary": "Synthetic",
+                          "repository_url": "https://example.com"},
+              "agents": [], "milestones": [], "events": [], "decisions": [], "blockers": [],
+              "budget": {"scope": "fixture", "timezone": "UTC", "daily_limit_usd": 20,
+                         "spent_usd": None, "reserved_usd": None}}
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    source_path = runtime / "status.json"
+    source_path.write_text(json.dumps(source))
+    original = source_path.read_bytes()
+    supervisor_fakes(monkeypatch, 61)  # t=1000, 1300, 1600 without any browser requests.
+    monkeypatch.setattr(ops, "check_health", lambda _: (True, "health_ok"))
+    state = ops.supervise(tmp_path, 8766)
+    captured = json.loads((runtime / STATE_FILE).read_text())
+    assert len(captured["history"]) == 3
+    assert captured["next_attempt_at"] == ops.timestamp(1900)
+    assert captured["source_observed_at"] == source["observed_at"]
+    assert captured["latest_capture"]["service"]["checked_at"] == ops.timestamp(1600)
+    assert state["restarts"] == 0 and source_path.read_bytes() == original
+    ops.prepare_diagnosis.assert_not_called()
 
 
 def test_degraded_readiness_never_restarts_a_healthy_service(tmp_path, monkeypatch):

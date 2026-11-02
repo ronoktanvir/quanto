@@ -48,6 +48,18 @@ If the port already serves healthy Quanto, the supervisor records `healthy_exter
 
 The atomic operations snapshot contains the last check, last success, health state, reason, recent checks, restart history, observation gaps, diagnosis status, and the awake-host limitation. These fields describe website observations. They never refresh `runtime/status.json` or any research/worker `observed_at` field. Corrupt or unsupported persisted state is an operator-repair condition, not permission to reset limits.
 
+## Five-minute website snapshots
+
+The running supervisor captures the current validated work record and a small allowlist of service observations every 300 seconds. The first attempt starts immediately when no capture schedule exists. A browser does not need to be open. The one-shot `--once` check does not start this schedule, and no capture calls a model, broker, or network service. These snapshots are saved status records, not screenshots or new observations of native workers.
+
+`runtime/website-snapshots.json` atomically stores the most recent successful capture, the last attempt and result, the next scheduled attempt, and at most 60 attempt summaries. Its maximum size is 2 MiB plus 128 KiB; the source work record remains limited to 2 MiB. Source `observed_at` and individual agent timestamps remain exactly as recorded. Taking a new snapshot of unchanged work does not make that work fresh.
+
+Every attempt reserves its next deadline before reading the source. A failure keeps the previous successful capture and waits until the next five-minute deadline. An interrupted claim becomes a failed `capture_interrupted` attempt when the recorder resumes; it is not replayed, and the next new attempt keeps the reserved deadline. After sleep or a long outage, the recorder makes one attempt and sets the following deadline 300 seconds later, without a catch-up burst. A process lock prevents competing recorders from duplicating an attempt. Corrupt metadata, unsafe paths, or inconsistent history fail visibly instead of resetting the schedule. Snapshot failures do not trigger website restarts.
+
+The read-only `/api/snapshot-status` endpoint reports last attempt, last success, next attempt, source observation time, result, safe failure category, and the server's current time. It creates neither captures nor sessions. The website displays these fields separately from work freshness. A stopped, missing, or stale supervisor clears the active next-attempt deadline; the previously scheduled deadline remains available as `scheduled_attempt_at`. A failed capture with a healthy supervisor retains its real retry deadline. If the machine sleeps, the displayed countdown cannot establish that an attempt happened; a subsequent server response is required.
+
+Only the latest successful capture is retained, not a complete archive. The bounded history describes capture attempts, not research results. The capture file and its lock remain ignored local runtime outputs. `tests/test_snapshots.py` covers synthetic timing, restart, interruption, retention, malformed input, unsafe paths, and competing processes; it does not establish uninterrupted hosting.
+
 ## Bounded advisory model diagnosis
 
 Healthy routine checks make zero model calls. After three failed checks, a new deterministic fault signature may request a small Haiku diagnosis through the server-side provider gateway. The signature combines the fixed fault category, dashboard component, and normalized message hash. Repeated signatures are not dispatched again; model downtime is reported as unavailable or failed, never as successful diagnosis.

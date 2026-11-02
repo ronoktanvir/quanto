@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 
 from quanto.conversations import Conversations, ConversationError
+from quanto.snapshots import snapshot_status
 
 MAX_STATUS_BYTES = 2 * 1024 * 1024
 ASSETS = {
@@ -217,6 +218,8 @@ def make_server(
                 self._status()
             elif path == "/api/health-details":
                 self._health_details()
+            elif path == "/api/snapshot-status":
+                self._json(200, snapshot_status(Path(root)))
             elif path in ("/api/session", "/api/conversations", "/api/inbox"):
                 try:
                     session, csrf = self._session(create=path == "/api/session")

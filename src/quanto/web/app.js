@@ -25,6 +25,10 @@ let changingModelCalls = false;
 let chatMode = "assistant";
 let inboxFetching = false;
 let inquiries = [];
+let captureMetadata = null;
+let captureMetadataAvailable = false;
+let captureMetadataFetching = false;
+let captureMetadataReceived = null;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -378,14 +382,97 @@ function renderBudget(budget) {
 }
 function updateFreshness() {
   const connection = $("connection");
-  if (!snapshot) { connection.textContent = fetchFailed ? "Snapshot unavailable" : "Connecting…"; connection.className = `connection${fetchFailed ? " failed" : ""}`; return; }
+  if (!snapshot) { connection.textContent = fetchFailed ? "Progress record unavailable" : "Loading progress…"; connection.className = `connection${fetchFailed ? " failed" : ""}`; return; }
   const age = (Date.now() - new Date(snapshot.observed_at).getTime()) / 1000;
   const stale = age > 90 || age < -5;
   $("snapshot-age").textContent = `${stale ? "Stale · " : ""}${ageLabel(age)}`;
   $("snapshot-age").classList.toggle("stale-label", stale);
-  connection.textContent = fetchFailed ? "Refresh failed" : paused ? "Updates paused" : stale ? "Snapshot stale" : "Snapshot current";
+  connection.textContent = fetchFailed ? "Progress refresh failed" : paused ? "Work updates paused" : stale ? "Progress record stale" : "Progress record current";
   connection.className = `connection ${fetchFailed ? "failed" : stale || paused ? "stale" : "fresh"}`;
   connection.title = lastReceived ? `Last successful fetch: ${dateLabel(lastReceived)}` : "";
+}
+
+function captureCountdownLabel(value, now = Date.now()) {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return { text: "Unavailable", state: "unavailable" };
+  const remaining = Date.parse(value) - now;
+  const format = (seconds) => `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+  if (remaining > 0) return { text: `In ${format(Math.ceil(remaining / 1000))}`, state: "scheduled" };
+  if (remaining >= -1000) return { text: "Due now", state: "due" };
+  return { text: `Overdue ${format(Math.floor(-remaining / 1000))}`, state: "overdue" };
+}
+function updateCaptureCountdown() {
+  const recent = captureMetadataReceived && Date.now() - captureMetadataReceived < 30000;
+  const available = captureMetadataAvailable && recent && !["stopped", "never_started"].includes(captureMetadata?.status);
+  const next = available ? captureMetadata?.next_attempt_at : null;
+  const label = captureCountdownLabel(next);
+  $("capture-next-attempt").textContent = next ? dateLabel(next) : "Unavailable";
+  $("capture-next-attempt").title = next || "";
+  $("capture-countdown").textContent = label.text;
+  $("capture-countdown").className = `capture-countdown capture-${label.state}`;
+  if (captureMetadataAvailable && !recent) {
+    $("capture-availability").textContent = "Metadata needs refresh";
+    $("capture-monitor-note").textContent = "The last received metadata is old; the next attempt is unverified until it refreshes. Capture timing does not establish new agent progress.";
+  }
+}
+function renderCaptureMetadata() {
+  const data = captureMetadata;
+  if (!data) return;
+  const time = (id, value) => { $(id).textContent = value ? dateLabel(value) : "Unavailable"; $(id).title = value || ""; };
+  time("capture-last-attempt", data.last_attempt_at);
+  time("capture-last-success", data.last_success_at);
+  time("capture-source-observed", data.source_observed_at);
+  const result = data.last_result === "success" ? "Success" : ["failure", "failed"].includes(data.last_result) ? "Failed" : data.last_result === "pending" ? "Pending" : "Unavailable";
+  $("capture-result").textContent = result;
+  $("capture-result").className = `capture-result capture-result-${result.toLowerCase()}`;
+  $("capture-interval").textContent = data.interval_seconds === 300 ? "Every 5 minutes" : `Every ${data.interval_seconds} seconds`;
+  const status = { never_started: "No capture yet", current: "Recorder current", delayed: "Recorder delayed", stopped: "Recorder stopped", error: "Recorder error", capturing: "Attempt claimed" };
+  $("capture-availability").textContent = status[data.status] || "Metadata received";
+  $("capture-monitor-note").textContent = captureExplanation(data);
+  updateCaptureCountdown();
+}
+function captureExplanation(data) {
+  const reasons = {
+    monitor_not_started: "No capture attempt has been recorded yet.",
+    monitor_missing_or_invalid: "Recorder health is unavailable; the next attempt cannot be confirmed.",
+    monitor_stopped: "The local recorder is stopped. No next attempt is confirmed.",
+    clock_moved_backwards: "The device clock moved backwards; capture scheduling needs verification.",
+    monitor_stale: "The recorder has not checked in recently. No next attempt is confirmed.",
+    capture_due: "The recorded capture deadline is due; no newer attempt is recorded yet.",
+    attempt_pending_or_interrupted: "A capture attempt was claimed; no completed result is recorded yet.",
+    scheduled: "The recorder reports its next scheduled attempt.",
+    snapshot_metadata_invalid_or_unavailable: "Capture records are unavailable or invalid; no next attempt is confirmed.",
+    metadata_invalid: "Capture records are invalid; no next attempt is confirmed.",
+  };
+  const errors = {
+    source_missing: "The saved agent-progress record is missing.",
+    source_invalid: "The saved agent-progress record is invalid.",
+    source_unsafe: "The saved agent-progress record could not be read safely.",
+    source_oversized: "The saved agent-progress record exceeds the capture limit.",
+    service_observation_invalid: "The recorded local health check is invalid.",
+    capture_interrupted: "The previous capture was interrupted.",
+    capture_storage_unavailable: "Capture storage is unavailable.",
+    clock_invalid: "The recorder's clock needs verification.",
+  };
+  if (data.reason === "last_attempt_failed") return `${errors[data.error] || "The last capture attempt failed."}${data.next_attempt_at ? " A later attempt is scheduled." : " No next attempt is confirmed."}`;
+  return reasons[data.reason] || errors[data.error] || "The recorder's capture state needs verification.";
+}
+async function refreshCaptureMetadata() {
+  if (captureMetadataFetching) return;
+  captureMetadataFetching = true;
+  try {
+    const response = await fetch("/api/snapshot-status", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    const data = await responseJson(response, "Snapshot-monitor metadata is unavailable.");
+    const fields = ["last_attempt_at", "last_success_at", "next_attempt_at", "source_observed_at"];
+    const validTime = (value) => value === null || (typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) && Number.isFinite(Date.parse(value)));
+    if (!data || typeof data !== "object" || !fields.every((field) => Object.hasOwn(data, field) && validTime(data[field])) || !Number.isInteger(data.interval_seconds) || data.interval_seconds <= 0 || ![null, "success", "failure", "failed", "unavailable", "pending"].includes(data.last_result)) throw new Error("Snapshot-monitor metadata is incomplete or invalid.");
+    captureMetadata = data; captureMetadataAvailable = true; captureMetadataReceived = Date.now();
+    renderCaptureMetadata();
+  } catch (error) {
+    captureMetadataAvailable = false;
+    $("capture-availability").textContent = "Metadata unavailable";
+    $("capture-monitor-note").textContent = `Snapshot-monitor metadata could not be verified.${captureMetadata ? " Historical fields retain the last received metadata; the next attempt is unverified." : " No capture or next attempt is inferred."}`;
+    updateCaptureCountdown();
+  } finally { captureMetadataFetching = false; }
 }
 function renderSnapshot() {
   $("phase").textContent = readable(snapshot.project.phase);
@@ -748,8 +835,8 @@ async function sendInbox() {
   finally { sending = false; updateChatControls(); }
 }
 
-$("refresh").addEventListener("click", refresh);
-$("pause").addEventListener("click", () => { paused = !paused; $("pause").setAttribute("aria-pressed", String(paused)); $("pause").textContent = paused ? "Resume updates" : "Pause updates"; updateFreshness(); if (!paused) refresh(); });
+$("refresh").addEventListener("click", () => { refresh(); refreshCaptureMetadata(); });
+$("pause").addEventListener("click", () => { paused = !paused; $("pause").setAttribute("aria-pressed", String(paused)); $("pause").textContent = paused ? "Resume progress refresh" : "Pause progress refresh"; updateFreshness(); if (!paused) refresh(); });
 $("agent-search").addEventListener("input", renderWork);
 $("board-view").addEventListener("click", () => switchWorkView("board"));
 $("dependency-view").addEventListener("click", () => switchWorkView("map"));
@@ -778,6 +865,9 @@ $("inbox-mode").addEventListener("click", () => switchChatMode("inbox"));
 $("refresh-inbox").addEventListener("click", loadInbox);
 setInterval(() => { if (!paused) refresh(); }, 2000);
 setInterval(updateFreshness, 1000);
+setInterval(updateCaptureCountdown, 1000);
+setInterval(() => { if (!document.hidden) refreshCaptureMetadata(); }, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { updateCaptureCountdown(); refreshCaptureMetadata(); } });
 setInterval(() => { if (!paused) checkHealth(); }, 30000);
 setInterval(() => { if (!$("chat-drawer").hidden && chatMode === "inbox" && !sending && !inboxFetching) loadInbox(); }, 15000);
-renderWork(); refresh(); checkHealth();
+renderWork(); refresh(); checkHealth(); refreshCaptureMetadata();

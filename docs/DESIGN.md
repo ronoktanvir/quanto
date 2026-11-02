@@ -81,6 +81,34 @@ does not imply continuous native-agent telemetry; observations older than 90
 seconds are labeled stale. Refresh failure retains the last valid snapshot with
 an explicit notice.
 
+## Scheduled snapshot monitor
+
+The compact summary includes a separate capture monitor backed by
+`GET /api/snapshot-status`. It shows the last attempt, last successful capture,
+reported next attempt and a live countdown, last result, capture interval, and
+agent-progress observation saved by the capture. The board's own timestamp is
+labeled "Agent progress observed"; the monitor's saved source timestamp says
+"Agent progress observed at capture." A fresh capture does not make old agent
+evidence current.
+
+The capture schedule runs every 300 seconds on the local service, independently
+of the browser. Metadata is fetched every ten seconds while the page is visible
+and again on hidden-tab resume; the countdown recomputes from the server-provided
+deadline every second. The UI never derives a deadline from a previous attempt.
+Due and overdue deadlines are explicit. A stopped recorder, missing deadline,
+failed metadata fetch or metadata older than 30 seconds disables the active
+countdown. Historical fields may remain, labeled as the last received metadata.
+
+Pending/capturing metadata means a durable attempt was claimed, not a successful
+capture. The last-success timestamp remains unchanged. Failed capture attempts
+can retain a real server-reported retry deadline. Status/error categories receive
+plain explanations rather than exposing raw reason codes. No progress spinner or
+model call is involved. The schedule is qualified by the awake-Mac requirement.
+
+"Refresh view" reads the work and capture metadata without resetting the capture
+schedule. "Pause progress refresh" pauses work-view updates; metadata polling and
+the countdown continue, and the background recorder is unaffected.
+
 ## Conversations and original-worker inquiries
 
 A persistent user-opened drawer exposes the server's roles and exact models:
@@ -115,7 +143,7 @@ an awake Mac. The project budget cannot control unrelated account clients.
 
 The frontend producer changed only `src/quanto/web/*` and this design document for
 the revised interface. JavaScript syntax checks pass. The structural audit confirms
-all JavaScript element references exist, all 76 HTML IDs are unique, and CSS braces
+all JavaScript element references exist, all 87 HTML IDs are unique, and CSS braces
 balance. These are software checks, not investment evidence or independent review.
 Isolated synthetic graph checks pass for topological depth, changed milestone
 state, unknown references, cycles, duplicate relationships and missing edges.

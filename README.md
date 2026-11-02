@@ -2,7 +2,7 @@
 
 Quanto is a private quantitative research desk under construction. It combines deterministic calculations, recorded experiments, independent criticism, and a local interface for understanding the work. A separate trading service is planned after research and operational checks.
 
-**Current state:** the synthetic research engine, evidence/budget journal, interactive dashboard, contextual assistants, and local website supervisor exist. Actual Opus reviews have run. Real-data research, protected holdouts, persistent research roles, paper trading, and live execution remain incomplete. No strategy is validated and nothing is trading.
+**Current state:** the synthetic research engine, private artifact store, registered exploration, interactive dashboard, contextual assistants, and local website supervisor exist. A small Alpaca historical-data/calendar acquisition succeeded, and actual Opus reviews have run. Historical strategy evaluation, protected holdouts, persistent research roles, paper trading, and live execution remain incomplete. No strategy is validated and nothing is trading.
 
 ## Run locally
 
@@ -25,6 +25,27 @@ PYTHONPATH=src .venv/bin/python -m quanto serve --port 8766
 ```
 
 Open [the local desk](http://127.0.0.1:8766/). For macOS background supervision, inspect and install the project-owned LaunchAgent using the commands in [Operations](docs/OPERATIONS.md). Keep the project downloaded if its directory is synchronized with iCloud. Sleep, shutdown and logout interrupt local operation; this is not hosted 24/7 infrastructure.
+
+## Data and registered exploration
+
+For private historical acquisition, create keys in the Alpaca paper-account dashboard and save them through hidden prompts:
+
+```sh
+.venv/bin/python scripts/configure_alpaca.py
+PYTHONPATH=src .venv/bin/python -m quanto acquire-bars --request examples/requests/alpaca-bars.json
+PYTHONPATH=src .venv/bin/python -m quanto acquire-calendar --request examples/requests/alpaca-calendar.json
+PYTHONPATH=src .venv/bin/python -m quanto submissions --limit 20
+```
+
+The helper preserves existing settings and writes `.env` with owner-only permissions. The adapter allows only specific historical-data and calendar reads. Downloaded data remains inspection-only: corporate actions, information timing and other admission requirements still prevent historical backtesting. Each deliberate acquisition is a new recorded attempt; no automatic retry or feed substitution occurs. See [Data sources](docs/DATA_SOURCES.md) for coverage and rights limitations.
+
+Run a separate synthetic example to compare two lookbacks over identical evaluation dates, repeat one candidate under another name, and retain a malformed request:
+
+```sh
+PYTHONPATH=src .venv/bin/python examples/synthetic_exploration.py --root /tmp/quanto-synthetic-example
+```
+
+The example creates that directory and records all work there. It provides engineering evidence only. [Provenance](docs/PROVENANCE.md) explains artifact verification and retention; [Research protocol](docs/RESEARCH_PROTOCOL.md) explains development exposure, candidate counts and the remaining final-evaluation controls.
 
 ## Conversations and costs
 

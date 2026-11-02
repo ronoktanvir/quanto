@@ -6,10 +6,32 @@ import argparse
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
+import stat
 import sys
 
 from quanto.ledger import Journal, LedgerError, canonical_json, hash_bytes
+
+
+def _request_text(path: Path) -> str:
+    """Read a bounded local JSON envelope; parsing follows submission recording."""
+    from quanto.provenance import MAX_REQUEST_BYTES
+
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_REQUEST_BYTES:
+            raise ValueError("Request must be a regular file of at most 64 KiB")
+        with os.fdopen(descriptor, "rb") as source:
+            descriptor = None
+            raw = source.read(MAX_REQUEST_BYTES + 1)
+        if len(raw) > MAX_REQUEST_BYTES:
+            raise ValueError("Request exceeds the 64 KiB preflight boundary")
+        return raw.decode("utf-8")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def run_demo(root: Path) -> dict:
@@ -66,6 +88,20 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect persisted research and budget records")
     review = sub.add_parser("review", help="Request one paid Opus critique under the daily cap")
     review.add_argument("--packet", type=Path, required=True, help="Sanitized review text file")
+    for name, description in (
+        ("acquire-bars", "Acquire private historical Alpaca bars for data inspection"),
+        ("acquire-calendar", "Acquire the paper-account session calendar"),
+        ("register-dataset", "Register exact dataset bytes and their declared scope"),
+        ("explore", "Record and execute an eligible exploratory study"),
+    ):
+        command = sub.add_parser(name, help=description)
+        command.add_argument("--request", type=Path, required=True,
+                             help="Local JSON request; credentials belong only in .env")
+    submissions = sub.add_parser("submissions", help="Inspect recorded work and failed submissions")
+    submissions.add_argument("--kind")
+    submissions.add_argument("--status", choices=("pending", "success", "invalid", "failed",
+                                                  "interrupted"))
+    submissions.add_argument("--limit", type=int, default=20)
     args = parser.parse_args(argv)
     root = args.root.resolve()
     try:
@@ -79,6 +115,23 @@ def main(argv: list[str] | None = None) -> int:
             from quanto.critic import request_review
             output = request_review(root, args.packet.read_text())
             output = {key: value for key, value in output.items() if key != "text"}
+        elif args.command in {"acquire-bars", "acquire-calendar", "register-dataset", "explore"}:
+            request = _request_text(args.request)
+            if args.command in {"acquire-bars", "acquire-calendar"}:
+                from quanto.alpaca_data import acquire_bars, acquire_calendar
+                action = acquire_bars if args.command == "acquire-bars" else acquire_calendar
+            else:
+                from quanto.explorer import register_dataset, run_submission
+                action = register_dataset if args.command == "register-dataset" else run_submission
+            output = action(root, request)
+        elif args.command == "submissions":
+            if not (root / "runtime" / "research.sqlite").exists():
+                output = {"status": "not_initialized", "submissions": []}
+            else:
+                from quanto.provenance import Provenance
+                with Provenance(root) as store:
+                    output = {"submissions": store.list_submissions(
+                        kind=args.kind, status=args.status, limit=args.limit)}
         else:
             database = root / "runtime" / "research.sqlite"
             if not database.exists():
@@ -87,7 +140,9 @@ def main(argv: list[str] | None = None) -> int:
                 with Journal(database) as journal:
                     output = journal.overview()
         print(json.dumps(output, indent=2, allow_nan=False))
-        return 0
+        return 1 if output.get("status") in {
+            "invalid", "failed", "interrupted", "rejected", "pending"
+        } else 0
     except (ValueError, OSError) as exc:
         print(f"Quanto: {exc}", file=sys.stderr)
         return 1

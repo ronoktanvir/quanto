@@ -14,6 +14,12 @@ The one-shot broker now implements that mapping, exact failure-ID authorization,
 
 The D008 council pair reserved USD2 atomically before dispatch and retained both holds as uncertain. With earlier holds, the cooperating November1 Los Angeles ledger committed USD19.979279 of20 at the recorded checkpoint. CLI list-price estimates are not invoices and do not release those holds. The current day and runtime ledger govern later work; no purchase, fallback or paid retry occurred.
 
+### First actual workflow and packet correction
+
+After PR6 merged, the first actual cycle produced three observed Haiku responses and stopped at the engineer before any calculation. The hypothesis proposed a supported predicate; the engineer retained it but declined execution. Separate actual-trace criticism, quality and scope preserve this unsuccessful attempt. Numerical/oracle verification did not run. The first local launch command used a non-invoking module and produced zero submissions or dispatches; its correction is retained separately and was not a paid retry.
+
+The actual trace exposed a source-level description error missed by synthetic review: the packet called the unchanged SMA method a trailing-return rule. A neutral method label is required. The proposed bounded correction also communicates supervisor-derived current roster/common-specification integrity and clarifies that execution requests a test rather than certifying its predicate. No raw observations, private rule parameters or result truth are needed. The method description defect is established; whether it caused the stop remains an interpretation. Fresh source/egress checks and independent reviews must precede a distinct registered attempt. The original packet, responses, objections and stopped outcome remain unchanged.
+
 ## D001 Local research foundation
 
 Status: accepted for the foundation increment after five independently briefed perspectives and actual outside-model criticism. Full research protocol and real-data acceptance remain incomplete.

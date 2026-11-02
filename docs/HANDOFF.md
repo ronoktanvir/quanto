@@ -2,7 +2,19 @@
 
 Read AGENTS.md, CONTEXT, STATUS, REQUIREMENTS, ROADMAP, DECISIONS and D007_POLICY. Inspect Git and the runtime journal before relying on checkpoint figures. The complete private own-account operation remains active and incomplete.
 
-## D008 broker checkpoint — start here
+## Actual D008 stopped-workflow checkpoint — start here
+
+PR6 merged as `2dd9ab00fc7c9b6354ca409bba4bd51d7a890d0f` after Checks41409644486 passed on exact head47d2a0f481a74e2ed9855c16b49eeb040728d0f3. Current branch `feat/research-operation`. The full goal remains active.
+
+The first actual cycle is retained in runtime/d008/operational-outcome.json: submission `10fd962541a9458eadcbd6ca0110a938`, record `725687ebc9f5fbb0930f027c7a1d95f3f1301d44fd12242c9441454622d0a30a`. Three observed claude-haiku-5-5 responses: director proceed, hypothesis propose cost_ending_equity_nonincreasing, engineer stop. No financial launch or later four assignments. Independent D008-operational-critic/quality/scope reports confirm this boundary; arithmetic/oracle counts are zero, not successful numerical checks. November2 settled usage is$0.009116; retained research-purpose allocations$0.221817. Earlier six CLI holds stay on November1. Current journal governs later spending.
+
+Before this cycle, a root launch harness incorrectly used python -m quanto.cli, which defines but does not invoke main. Zero submissions/reservations/dispatches were confirmed. Its empty output/process/correction records remain as pre-entrypoint-* files. The supported python -m quanto then ran once. Do not rerun that actual request or silently replace its artifacts.
+
+The required correction is implemented in038714dfb47e30bf0ad506cfe79bd93ca51a651c: neutral truthful method label, supervisor-derived integrity-only current roster/specification fact, and execute-versus-certify semantics. Exact private packet/proof/configuration/planned request-ID binding precedes dispatch, preserving failed-response lineage. Fresh independent criticism closed that additional P2, and quality passed1133 tests plus12 subtests in source and clean installation with independent integrity/privacy/refusal/recovery probes and lint. Separate scope accepts the correction. Git integration is next before a distinct actual attempt. Private revised request runtime/d008/operational-request-v2.json is prepared, not dispatched; it uses a new run key. Do not overwrite or rerun the old request/outcome. Preserve old reports and actual trace. The label defect is established, its causal role in the stop is not. R14 and the full successful workflow remain incomplete.
+
+Private independent harnesses runtime/d008/inspect-actual-trace.py and verify-actual-workflow.py inspect local records and emit bounded metadata only. Their successful-financial branches are prepared, not observed on this stopped trace. Do not reuse the old current-source assertion against a revised packet without explicitly pinning the original archived source identities. No raw result/rationale/provider data should enter reviewer context.
+
+## D008 broker checkpoint — historical
 
 Current branch `feat/research-broker`, base `fc1c8c4e3c5f8dd37c77617f6a121d2ed42f57af`. Source/tests are frozen and independently reviewed; Git is authoritative for later commits. The previous foundation checkpoint below is historical and does not describe current broker integration.
 

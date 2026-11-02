@@ -6,8 +6,8 @@ import json
 import pytest
 
 from quanto.research_packets import (
-    FAILURE_CODES, FINDING_CODES, MAX_OUTPUT_BYTES, MAX_PACKET_BYTES, PREDICATES,
-    SYSTEM_PROMPT, PacketError, packet_messages, parse_role_output,
+    FAILURE_CODES, FINDING_CODES, MAX_OUTPUT_BYTES, MAX_PACKET_BYTES, METHOD, PREDICATES,
+    SUITE_INTEGRITY, SYSTEM_PROMPT, PacketError, packet_messages, parse_role_output,
     project_role_output, validate_packet, validate_projection,
 )
 from quanto.research_workflow import ROLES
@@ -35,7 +35,7 @@ def packet(role="hypothesis", **changes):
         "schema_version": 1, "kind": "research_role_context", "role": role,
         "objective": "frozen_suite_falsification", "evidence_kind": "synthetic_fixture",
         "access_class": "sanitized_development",
-        "method": "frozen_trailing_return_next_open_three_costs", "scope": "development_only",
+        "method": METHOD, "suite_integrity": SUITE_INTEGRITY, "scope": "development_only",
         "data_values_disclosed": False, "allowed_predicates": sorted(PREDICATES),
         "artifact_aliases": ["artifact-1", "artifact-2"],
         "failures": [{"alias": "failure-1", "code": "unsupported_due_bill",
@@ -75,6 +75,79 @@ def test_all_roles_have_fixed_bounded_packets_and_outputs(role):
     parsed = parse(role=role, required=PREDICATE if role in ROLES[2:] else None)
     assert parsed == output(role)
     assert project_role_output(parsed) == {k: v for k, v in parsed.items() if k != "rationale"}
+
+
+def test_packet_requires_exact_neutral_method_and_supervisor_integrity_fact():
+    assert METHOD == "frozen_next_open_three_cost_development_suite"
+    assert SUITE_INTEGRITY == "verified_roster_and_current_specification"
+    source = packet()
+    checked = validate_packet(source)
+    assert checked["method"] == METHOD
+    assert checked["suite_integrity"] == SUITE_INTEGRITY
+    rendered = json.loads(packet_messages(source)["messages"][0]["content"])
+    assert rendered == checked
+    del source["suite_integrity"]
+    with pytest.raises(PacketError, match="packet_fields_refused"):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("value", [
+    None, True, False, 1, 1.0, [], {}, [SUITE_INTEGRITY],
+    {"roster": "verified", "specification": "current"},
+    "", "unverified", "verified_data_accuracy", "verified_predicate_true",
+    "verified_roster", SUITE_INTEGRITY + " ", SUITE_INTEGRITY.upper(),
+    "2026-11-02", "provider-AAPL", "/private/suite.json", "sk-ant-private",
+    {"prices": [100, 101], "dates": ["2026-11-02"]},
+])
+def test_integrity_fact_rejects_wrong_types_unapproved_claims_and_private_payloads(value):
+    source = packet(suite_integrity=value)
+    for action in (validate_packet, packet_messages):
+        with pytest.raises(PacketError):
+            action(source)
+
+
+@pytest.mark.parametrize("value", [
+    "frozen_trailing_return_next_open_three_costs", METHOD + " ", METHOD.upper(),
+    "frozen_sma_three_costs", "private_strategy_parameters", None, True, [],
+    {"method": METHOD},
+])
+def test_method_rejects_old_inaccurate_label_and_nonexact_replacements(value):
+    with pytest.raises(PacketError):
+        validate_packet(packet(method=value))
+
+
+@pytest.mark.parametrize("extra", [
+    {"integrity_details": {"suite_sha256": "a" * 64}},
+    {"verified_predicate": True}, {"roster_verified": True},
+    {"artifact_purposes": {"artifact-1": "method_contract"}},
+    {"suite_integrity_source": "/private/suite.json"},
+])
+def test_integrity_fact_does_not_expand_packet_to_extra_claims_or_alias_purposes(extra):
+    with pytest.raises(PacketError):
+        validate_packet(packet(**extra))
+
+
+def test_integrity_fact_cannot_be_asserted_in_model_output_or_forwarded_projection():
+    with pytest.raises(PacketError):
+        parse(output(suite_integrity=SUITE_INTEGRITY))
+    source = packet()
+    source["prior_outputs"][0]["suite_integrity"] = SUITE_INTEGRITY
+    with pytest.raises(PacketError):
+        validate_packet(source)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_verified_integrity_preserves_free_stop_block_or_inconclusive_decisions(role):
+    decisions = ["stop"] if role in ROLES[:3] else ["block", "inconclusive"]
+    for decision in decisions:
+        source = packet(role)
+        assert validate_packet(source)["suite_integrity"] == SUITE_INTEGRITY
+        stopped = output(role, decision=decision, findings=[{
+            "code": "specification_mismatch", "artifact_aliases": ["artifact-1"]}],
+            rationale="A synthetic justified method objection remains permitted.")
+        checked = parse(stopped, role=role, required=PREDICATE if role in ROLES[2:] else None)
+        assert checked["decision"] == decision
+        assert checked["findings"][0]["code"] == "specification_mismatch"
 
 
 @pytest.mark.parametrize("payload", [

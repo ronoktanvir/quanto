@@ -25,7 +25,7 @@ The process started at 00:25:33.668421Z and ended at 00:25:33.909716Z with exit 
 
 Zero unknown table schemas and zero tombstoned dependencies were observed in this generation. These counts do not establish complete nested document coverage: the inspector checks a declared database-reference subset, and every available canonical nontombstoned object is copied conservatively. All captured table state, including prior-day uncertain holds, consumed dispatches and failed work, is preserved rather than reset.
 
-The final product passed 44 focused tests and 16 independent probes on source Python 3.13 and clean installed Python 3.11. Earlier full-suite results and the discovered Python 3.11 compatibility failure remain separately recorded in the [quality report](D009-capture-quality.md); they must not be presented as a final-revision full-suite pass. Final GitHub CI will supply its own exact-revision evidence.
+The final product passed 44 focused tests and 16 independent probes on source Python 3.13 and clean installed Python 3.11. Earlier full-suite results and the discovered Python 3.11 compatibility failure remain separately recorded in the [quality report](D009-capture-quality.md); they must not be presented as a final-revision full-suite pass. Final GitHub CI subsequently passed 1,417 tests plus 37 subtests in 222.39 seconds on head `a49bc0a7441f20f7382e85117a61c7a90cf090d0` (Checks41553248158). Lint, CLI and repository checks also passed; PR12 merged as `3567d3b674fdf6df1b4ddbb59a3b4d11007fc8d5`.
 
 ## Remaining recovery boundary
 

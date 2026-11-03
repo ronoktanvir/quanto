@@ -6,11 +6,11 @@ Quanto can capture and inspect an inert local research-store candidate. This pre
 
 `quanto.recovery.capture_research_snapshot(source_root, destination, *, limits=Limits())` creates a new private destination outside the entire source root. It refuses an existing destination, unsafe paths, unsupported journal mode, conflicting writers, missing known live references and exceeded limits. A failed generation is retained for diagnosis; callers must not blindly retry or overwrite it.
 
-The source must have its research SQLite database and canonical object directory. Capture preserves every table and row through SQLite's online backup API. A read transaction precedes a separate writer barrier so a hot rollback journal is refused without recovery modifying the source. Cooperating database/object publishers are serialized; unrelated filesystem actors are outside this application boundary. Committed tombstones remain unavailable and are not resurrected.
+The source must contain `runtime/research.sqlite` and `data/objects/`. Capture preserves every table and row through SQLite's online backup API. A read transaction precedes a separate writer barrier so a hot rollback journal is refused without recovery modifying the source. Cooperating database/object publishers are serialized; unrelated filesystem actors are outside this application boundary. Committed tombstones remain unavailable and are not resurrected.
 
 `inspect_research_snapshot(snapshot, *, expected_manifest_sha256=None, expected_event_head=None, limits=Limits())` verifies a closed candidate read-only. Pass separately retained expected identities when checking a known generation. The inspector verifies file inventories and digests, database integrity and table state, the event chain and supported database references. It never initializes application state or grants execution authority.
 
-Default bounds are 64 MiB of database bytes,16 MiB per object, 256 MiB combined payload, 10,000 object entries, 100,000 rows, 8 MiB of manifest, 2 seconds of lock wait and 15 seconds per capture/inspection operation. Callers may lower these bounds, not raise them. There is intentionally no production restore or scheduler command in this increment.
+Default bounds are 64 MiB of database bytes, 16 MiB per object, 256 MiB combined payload, 10,000 object entries, 100,000 rows, 8 MiB of manifest, 2 seconds of lock wait and 15 seconds per capture/inspection operation. Callers may lower these bounds, not raise them. There is intentionally no production restore or scheduler command in this increment.
 
 ## Meaning of a successful result
 

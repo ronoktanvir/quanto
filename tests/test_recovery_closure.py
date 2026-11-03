@@ -338,6 +338,40 @@ def test_packet_configuration_identity_must_match_registered_code_hash(tmp_path)
         inspect(*captured(source, tmp_path))
 
 
+@pytest.mark.parametrize("producer,expected", [
+    (key, "refused" if profile == "legacy_038" else "current")
+    for key, profile in closure.PACKET_PRODUCERS.items()
+] + [("e" * 64, "unresolved")])
+def test_failure_basis_event_requires_its_own_compatible_recorded_producer(tmp_path, producer, expected):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        packet = packet_fixture(store, producer=producer, modern=expected == "current")
+        event = {field: packet[field] for field in
+                 ("parent_submission_id", "assignment_id", "request_id", "fence", "configuration_sha256")}
+        event["basis_sha256"] = store.put_json({"synthetic": "basis"})
+        store.journal.append_event("workflow_broker_failure_basis_bound", event)
+    if expected == "refused":
+        with pytest.raises(closure.ClosureError, match="^event_producer_binding_mismatch$"):
+            inspect(*captured(source, tmp_path))
+    else:
+        report = inspect(*captured(source, tmp_path))
+        assert ("failure_basis_profile_origin_unresolved" in reasons(report)) == (expected == "unresolved")
+        assert event["basis_sha256"] in {edge["digest"] for edge in report["edges"]}
+        assert report["full_recovery_accepted"] is False
+
+
+def test_current_failure_basis_event_requires_complete_writer_shape(tmp_path):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        packet = packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True)
+        event = {field: packet[field] for field in
+                 ("parent_submission_id", "assignment_id", "fence", "configuration_sha256")}
+        event["basis_sha256"] = store.put_json({"synthetic": "basis"})
+        store.journal.append_event("workflow_broker_failure_basis_bound", event)
+    with pytest.raises(closure.ClosureError, match="^malformed_supported_profile$"):
+        inspect(*captured(source, tmp_path))
+
+
 def test_unknown_schema_event_submission_and_orphan_are_explicit(tmp_path):
     source = source_store(tmp_path)
     with Provenance(source) as store:

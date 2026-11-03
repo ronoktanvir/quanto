@@ -366,6 +366,8 @@ class _Reader:
             _need(type(data) is dict)
             if kind == "workflow_broker_packet_bound":
                 self.packet_references(parent, data)
+            elif kind == "workflow_broker_failure_basis_bound":
+                self.failure_basis_references(parent, data)
             else:
                 for field, role in EVENT_REFS[kind].items():
                     _need(field in data)
@@ -373,7 +375,7 @@ class _Reader:
             self.gap("event_binding_semantics_not_checked", kind)
 
     def packet_producer(self, parent, data):
-        """Select only a recorded, hash-bound public producer pair; no replay."""
+        """Select the shared broker-event writer pair, never infer it from keys."""
         identity = data.get("parent_submission_id")
         if type(identity) is not str or not identity:
             self.gap("unresolved_packet_producer_binding", parent)
@@ -418,6 +420,21 @@ class _Reader:
             self.gap("unsupported_packet_producer_identity", parent)
             return None
         return profile
+
+    def failure_basis_references(self, parent, data):
+        fields = EVENT_REFS["workflow_broker_failure_basis_bound"]
+        for field, role in fields.items():
+            _need(field in data)
+            self.edge(parent, field, data[field], role)
+        profile = self.packet_producer(parent, data)
+        _need(profile != "legacy_038", "event_producer_binding_mismatch")
+        if profile is None:
+            self.gap("failure_basis_profile_origin_unresolved", parent)
+            return
+        _object(data, {"parent_submission_id", "assignment_id", "request_id", "fence", *fields})
+        for field in ("parent_submission_id", "assignment_id", "request_id"):
+            _text(data[field])
+        _need(type(data["fence"]) is int and data["fence"] > 0)
 
     def packet_references(self, parent, data):
         fields = EVENT_REFS["workflow_broker_packet_bound"]

@@ -17,6 +17,7 @@ import time
 from types import CodeType, FunctionType, ModuleType
 
 from quanto import recovery
+from quanto import recovery_lineage
 
 PROFILE = "research_closure_subset_v1"
 FLAGS = {"typed_closure_complete": False, "full_recovery_accepted": False,
@@ -118,7 +119,7 @@ def _loaded_value(value, stack=()):
 
 def _implementation_identity():
     result = {}
-    for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery)):
+    for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery), ("lineage", recovery_lineage)):
         raw = recovery._read(Path(module.__file__).absolute(), 2 * 1024 * 1024)
         source = recovery._sha(raw)
         _need(source == _SOURCE_AT_IMPORT[role], "implementation_source_changed")
@@ -208,6 +209,7 @@ class _Reader:
         self.distances, self.current_hops = {}, -1
         self.nodes, self.rows_read, self.json_items = [], 0, 0
         self.broker_runs = None
+        self.lineage = recovery_lineage.Lineage(self)
 
     def tick(self):
         _need(time.monotonic() < self.deadline, "closure_deadline")
@@ -285,6 +287,7 @@ class _Reader:
         self.edge(parent, field, digest, "inline", "inline_identity")
 
     def roots(self):
+        self.lineage.index()
         for table in self.manifest["database_state"]["unknown_schema_tables"]:
             self.gap("unsupported_table_schema", table)
         for table, fields in DIRECT.items():
@@ -304,15 +307,15 @@ class _Reader:
                 self.edge(f"research_dispatch_holds/{index}", field, row[field],
                           "dispatch_identity", "inline_identity")
             self.gap("dispatch_binding_not_checked", "research_dispatch_holds")
-        submissions = {row["submission_id"]: row for row in self.rows("provenance_submissions")}
+        submissions = self.lineage.submissions
         for identity, row in submissions.items():
             self.edge("submission/" + identity, "request_sha256", row["request_sha256"],
                       "recorded_request_identity", "inline_identity")
-            if row["kind"] not in DETAILS:
+            if row["kind"] not in DETAILS and row["kind"] not in recovery_lineage.REGISTRATIONS:
                 self.gap("unsupported_submission_kind", row["kind"])
-        for row in self.rows("provenance_outcomes"):
+        for row in self.lineage.outcomes.values():
             parent = "submission/" + row["submission_id"]
-            data = self.parse(row["details"])
+            data = row["details"]
             _need(type(data) is dict)
             self.refs(parent, "artifact_refs", data.get("artifact_refs", []))
             source = submissions.get(row["submission_id"])
@@ -323,8 +326,9 @@ class _Reader:
             for field, role in DETAILS.get(kind, {}).items():
                 if data.get(field) is not None:
                     self.edge(parent, field, data[field], role)
-            # Details carry producer-specific metadata beyond this finite root subset.
-            self.gap("submission_details_semantics_not_checked", kind)
+            if not self.lineage.outcome_root(row["submission_id"]):
+                # Details outside this finite family retain their original gap.
+                self.gap("submission_details_semantics_not_checked", kind)
         for index, row in enumerate(self.rows("workflow_runs")):
             data = self.parse(row["manifest"])
             _need(type(data) is dict)
@@ -357,12 +361,13 @@ class _Reader:
             # findings is arbitrary canonical JSON. Its key spelling does not
             # identify critic.py or any other producer or external file schema.
             self.gap("unsupported_review_record", "reviews")
-        for row in self.rows("events"):
+        for row, data in self.lineage.events:
+            if self.lineage.event_root(row, data):
+                continue
             kind, parent = row["kind"], "event/" + str(row["id"])
             if kind not in EVENT_REFS:
                 self.gap("unsupported_event_profile", kind)
                 continue
-            data = self.parse(row["payload"])
             _need(type(data) is dict)
             if kind == "workflow_broker_packet_bound":
                 self.packet_references(parent, data)
@@ -562,7 +567,15 @@ class _Reader:
         for field in ("admission_evidence", "study_suite"):
             _need(data[field] is None or type(data[field]) is dict)
             if data[field] is not None:
-                self.gap("unsupported_embedded_" + field, digest)
+                if field == "admission_evidence" and data["admission_sha256"] is not None:
+                    saved = self.lineage.document(data["admission_sha256"])
+                    if saved is not None and type(saved.get("code_identity")) is dict and self.lineage.code_profile(
+                            data["admission_sha256"], saved["code_identity"]) is not None:
+                        _need(recovery._json(saved) == recovery._json(data[field]), "embedded_admission_mismatch")
+                    else:
+                        self.gap("unsupported_embedded_" + field, digest)
+                else:
+                    self.gap("unsupported_embedded_" + field, digest)
         # This derived specification is not the original submission request.
         for field in ("frozen_request", "engine_report"):
             self.edge(digest, field, recovery._sha(recovery._json(data[field])), "inline", "inline_identity")
@@ -595,8 +608,18 @@ class _Reader:
                 continue
             raw = recovery._read(self.path / "objects" / (digest + ".bin"), self.limits.snapshot.object_bytes, private=True)
             _need(recovery._sha(raw) == digest, "object_changed")
-            if role == "opaque_provider_page":
+            if role in recovery_lineage.OPAQUE:
                 node["status"] = "opaque_leaf"
+                continue
+            if role in recovery_lineage.ROLES:
+                # Versionless historical requests and manual consumer artifacts
+                # have role-specific version rules; old profiles remain strict.
+                if role == "dataset_source" and digest not in self.lineage.normalized_origins:
+                    self.gap("normalized_observation_origin_unresolved", digest)
+                    continue
+                data = None if role == "original_request" else self.lineage.document(digest)
+                if self.lineage.handle(digest, role, data):
+                    node["status"] = "supported_structure_checked"
                 continue
             if role not in SUPPORTED:
                 self.gap("unsupported_object_role", digest + ":" + role)
@@ -682,6 +705,8 @@ def inspect_research_closure(snapshot: Path, *, expected_manifest_sha256: str,
         return report
     except ClosureError:
         raise
+    except recovery_lineage.LineageError as exc:
+        raise ClosureError(str(exc)) from None
     except recovery.RecoveryError:
         raise ClosureError("snapshot_verification_failed") from None
     except (OSError, sqlite3.Error, ValueError, TypeError, KeyError, RecursionError, OverflowError):
@@ -698,7 +723,8 @@ def public_projection(report: dict) -> dict:
               and type(report["supported_profiles_verified"]) is bool
               and all(report[key] is False for key in FLAGS), "invalid_report")
         identities = {key: _digest(report[key]) for key in ("manifest_sha256", "event_head", "schema_sha256", "table_state_sha256",
-                     "inspector_source_sha256", "inspector_loaded_sha256", "recovery_source_sha256", "recovery_loaded_sha256")}
+                     "inspector_source_sha256", "inspector_loaded_sha256", "recovery_source_sha256", "recovery_loaded_sha256",
+                     "lineage_source_sha256", "lineage_loaded_sha256")}
         counts = {key: report["counts"][key] for key in ("nodes", "edges", "unsupported", "supported_nodes", "tombstoned_edges")}
         _need(all(type(value) is int and value >= 0 for value in counts.values()), "invalid_report")
         _need(report["supported_profiles_verified"] == (counts["supported_nodes"] > 0), "invalid_report")
@@ -718,6 +744,6 @@ def public_projection(report: dict) -> dict:
 # a cooperating-process stability boundary, not a claim against hostile patches.
 _OWN_NAMES = {role: {name for name, value in vars(module).items()
               if isinstance(value, (FunctionType, type)) and value.__module__ == module.__name__}
-              for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery))}
+              for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery), ("lineage", recovery_lineage))}
 _SOURCE_AT_IMPORT = {role: recovery._sha(recovery._read(Path(module.__file__).absolute(), 2 * 1024 * 1024))
-                     for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery))}
+                     for role, module in (("inspector", sys.modules[__name__]), ("recovery", recovery), ("lineage", recovery_lineage))}

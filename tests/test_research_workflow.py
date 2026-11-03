@@ -9,10 +9,14 @@ import sqlite3
 import threading
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.ledger import StaleLease
 from quanto.provenance import Provenance
 from quanto.research_workflow import ResearchWorkflow, ROLES, WorkflowError
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 class Clock:

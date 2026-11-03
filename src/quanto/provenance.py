@@ -6,7 +6,8 @@ provider truth, historical availability, or protection against the local owner.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
+from collections import OrderedDict
 import hashlib
 import json
 import os
@@ -18,11 +19,14 @@ from typing import Any
 import uuid
 
 from quanto.ledger import Journal, LedgerError, MAX_JSON_BYTES, canonical_json
+from quanto.evaluation_registry import AccessError, authorize_publication, consume_grant, current_session
 
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_ARTIFACT_BYTES = 16 * 1024 * 1024
 MAX_DETAILS_BYTES = 64 * 1024
 MAX_ARTIFACT_REFS = 128
+MAX_READ_CACHE_BYTES = 32 * 1024 * 1024
+MAX_READ_CACHE_OBJECTS = 256
 TERMINAL_STATUSES = frozenset({"success", "invalid", "failed", "interrupted"})
 TOMBSTONE_REASONS = frozenset(
     {"accidental_secret", "rights_request", "operator_requested", "invalid_artifact"}
@@ -113,7 +117,9 @@ class Provenance:
         self.root = Path(root).absolute()
         self._root_fd = self._runtime_fd = self._data_fd = self._objects_fd = None
         self.journal: Journal | None = None
+        self._read_cache, self._read_cache_bytes = OrderedDict(), 0
         try:
+            self.access = current_session(self.root)
             self._root_fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             self._runtime_fd = self._directory(self._root_fd, "runtime")
             self._data_fd = self._directory(self._root_fd, "data")
@@ -143,6 +149,8 @@ class Provenance:
             except FileExistsError:
                 pass
             self.journal = Journal(self.root / "runtime" / "research.sqlite")
+            journal_info = os.stat("research.sqlite", dir_fd=self._runtime_fd, follow_symlinks=False)
+            self._journal_identity = (journal_info.st_dev, journal_info.st_ino)
             self.journal.connection.executescript(_SCHEMA)
             for table in ("provenance_submissions", "provenance_outcomes", "artifact_tombstones"):
                 for operation in ("UPDATE", "DELETE"):
@@ -170,6 +178,8 @@ class Provenance:
         self.close()
 
     def close(self) -> None:
+        self._read_cache.clear()
+        self._read_cache_bytes = 0
         if self.journal is not None:
             self.journal.close()
             self.journal = None
@@ -346,7 +356,12 @@ class Provenance:
             raise ProvenanceError("Artifact has been tombstoned")
 
     @contextmanager
-    def _blob(self, digest: str):
+    def _blob(self, digest: str, *, grant=None):
+        try:
+            self.access.check(self.root)
+            consume_grant(grant, "content_read", digest)
+        except AccessError:
+            raise ProvenanceError("Content access refused") from None
         fd = os.open(
             digest + ".bin", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=self._objects_fd
         )
@@ -359,78 +374,152 @@ class Provenance:
         finally:
             os.close(fd)
 
+    def _read_identity(self, digest):
+        """Cooperating-writer metadata witness; not hostile-owner attestation."""
+        directory = os.stat(self.root / "data/objects", follow_symlinks=False)
+        opened = os.fstat(self._objects_fd)
+        journal = os.stat("research.sqlite", dir_fd=self._runtime_fd, follow_symlinks=False)
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid()
+                or directory.st_mode & 0o022 or (directory.st_dev, directory.st_ino) != (opened.st_dev, opened.st_ino)
+                or not stat.S_ISREG(journal.st_mode) or journal.st_uid != os.getuid()
+                or journal.st_mode & 0o077 or journal.st_nlink != 1
+                or (journal.st_dev, journal.st_ino) != self._journal_identity):
+            raise ProvenanceError("Content visibility storage changed")
+        info = os.stat(digest + ".bin", dir_fd=self._objects_fd, follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1
+                or info.st_mode & 0o077 or not 0 <= info.st_size <= MAX_ARTIFACT_BYTES):
+            raise ProvenanceError("Artifact storage is unsafe or exceeds its bound")
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+                info.st_mode, info.st_uid, info.st_nlink)
+
+    def _forget_read(self, digest):
+        previous = self._read_cache.pop(digest, None)
+        if previous is not None:
+            self._read_cache_bytes -= len(previous[0])
+
+    def _remember_read(self, digest, raw, identity, epoch):
+        self._forget_read(digest)
+        if len(raw) > MAX_READ_CACHE_BYTES:
+            return
+        while self._read_cache and (self._read_cache_bytes + len(raw) > MAX_READ_CACHE_BYTES
+                                    or len(self._read_cache) >= MAX_READ_CACHE_OBJECTS):
+            _, previous = self._read_cache.popitem(last=False)
+            self._read_cache_bytes -= len(previous[0])
+        self._read_cache[digest] = (raw, identity, epoch)
+        self._read_cache_bytes += len(raw)
+
     def read_bytes(self, digest: str) -> bytes:
+        """Return verified immutable bytes, never reusing authority across sessions.
+
+        A cache hit reuses this instance's previously verified bytes after current
+        authority, revision, tombstone and exact file metadata checks. It performs
+        no content open. Every actual new open has a fresh durable effect start.
+        """
         self._available(digest)
         try:
-            with self._blob(digest) as source:
-                raw = source.read(MAX_ARTIFACT_BYTES + 1)
+            epoch = self.access.cache_epoch()
+            cached = self._read_cache.get(digest)
+            if cached is not None:
+                if cached[2] == epoch and self._read_identity(digest) == cached[1]:
+                    self._available(digest)
+                    if self.access.cache_epoch() != epoch or self._read_identity(digest) != cached[1]:
+                        self._forget_read(digest)
+                        raise ProvenanceError("Content authority or visibility changed during cached read")
+                    self._read_cache.move_to_end(digest)
+                    return cached[0]
+                self._forget_read(digest)
+            intent = self.access.content(digest)
+            with intent.effect(digest).start("content_read", digest) as grant:
+                before = self._read_identity(digest)
+                with self._blob(digest, grant=grant) as source:
+                    raw = source.read(MAX_ARTIFACT_BYTES + 1)
+                if self._read_identity(digest) != before:
+                    raise ProvenanceError("Artifact changed during read")
             if len(raw) > MAX_ARTIFACT_BYTES or hashlib.sha256(raw).hexdigest() != digest:
                 raise ProvenanceError("Artifact bytes do not match their identity")
-            return raw
-        except OSError:
-            raise ProvenanceError("Artifact is missing, unavailable or unsafe") from None
-
-    def put_bytes(self, raw: bytes) -> str:
-        if not isinstance(raw, bytes) or len(raw) > MAX_ARTIFACT_BYTES:
-            raise ProvenanceError("Artifact must be bounded bytes")
-        journal = self._open()
-        # Serialize publication against tombstones so a cooperating writer
-        # cannot recreate a physically purged object after its tombstone.
-        if journal.connection.in_transaction:
-            return self._publish(raw)
-        with journal._transaction():
-            return self._publish(raw)
-
-    def _publish(self, raw: bytes) -> str:
-        digest = hashlib.sha256(raw).hexdigest()
-        self._available(digest)
-        name, temporary = digest + ".bin", ".pending-" + uuid.uuid4().hex
-        try:
-            try:
-                os.stat(name, dir_fd=self._objects_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                pass
-            else:
-                self.read_bytes(digest)
-                return digest
-            fd = os.open(
-                temporary,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-                dir_fd=self._objects_fd,
-            )
-            with os.fdopen(fd, "wb") as output:
-                output.write(raw)
-                output.flush()
-                os.fsync(output.fileno())
-            try:
-                # link is an atomic no-replace publication within this directory.
-                os.link(
-                    temporary,
-                    name,
-                    src_dir_fd=self._objects_fd,
-                    dst_dir_fd=self._objects_fd,
-                    follow_symlinks=False,
-                )
-            except FileExistsError:
-                self.read_bytes(digest)
-            os.fsync(self._objects_fd)
+            if self.access.cache_epoch() != epoch:
+                raise ProvenanceError("Content authority changed during read")
             self._available(digest)
-            return digest
-        except OSError:
-            raise ProvenanceError("Artifact could not be stored safely") from None
-        finally:
-            try:
-                os.unlink(temporary, dir_fd=self._objects_fd)
-            except FileNotFoundError:
-                pass
+            self._remember_read(digest, raw, before, epoch)
+            return raw
+        except (OSError, AccessError):
+            self._forget_read(digest)
+            raise ProvenanceError("Artifact is missing, unavailable or access refused") from None
+        except ProvenanceError:
+            self._forget_read(digest)
+            raise
 
-    def put_json(self, value: Any) -> str:
+    def put_bytes(self, raw: bytes, *, publication=None) -> str:
+        return self._publish(raw, publication=publication)
+
+    def _publish(self, raw: bytes, *, publication=None) -> str:
+        if type(raw) is not bytes or len(raw) > MAX_ARTIFACT_BYTES:
+            try:
+                self.access.observe_import(unknown_reason="unbounded_bytes")
+            except AccessError:
+                raise ProvenanceError("Content publication access refused") from None
+            raise ProvenanceError("Artifact must be bounded bytes")
+        try:
+            authorize_publication(self.access, raw, publication)
+        except AccessError:
+            raise ProvenanceError("Content publication access refused") from None
+        journal = self._open()
+        # Account supplied bytes before research storage may fail. This
+        # transaction still serializes publication against tombstones.
+        with nullcontext() if journal.connection.in_transaction else journal._transaction():
+            digest = hashlib.sha256(raw).hexdigest()
+            self._available(digest)
+            name, temporary = digest + ".bin", ".pending-" + uuid.uuid4().hex
+            try:
+                try:
+                    os.stat(name, dir_fd=self._objects_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    self.read_bytes(digest)
+                    return digest
+                fd = os.open(
+                    temporary,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o600,
+                    dir_fd=self._objects_fd,
+                )
+                with os.fdopen(fd, "wb") as output:
+                    output.write(raw)
+                    output.flush()
+                    os.fsync(output.fileno())
+                try:
+                    # link is an atomic no-replace publication within this directory.
+                    os.link(
+                        temporary,
+                        name,
+                        src_dir_fd=self._objects_fd,
+                        dst_dir_fd=self._objects_fd,
+                        follow_symlinks=False,
+                    )
+                except FileExistsError:
+                    self.read_bytes(digest)
+                os.fsync(self._objects_fd)
+                self._available(digest)
+                return digest
+            except OSError:
+                raise ProvenanceError("Artifact could not be stored safely") from None
+            finally:
+                try:
+                    os.unlink(temporary, dir_fd=self._objects_fd)
+                except FileNotFoundError:
+                    pass
+
+    def put_json(self, value: Any, *, publication=None) -> str:
+        try:
+            self.access.observe_import(unknown_reason="json_input")
+        except AccessError:
+            raise ProvenanceError("Content publication access refused") from None
         try:
             raw = canonical_json(value).encode("utf-8")
         except (ValueError, UnicodeError, RecursionError, OverflowError, TypeError):
             raise ProvenanceError("Value must be bounded finite JSON") from None
-        return self.put_bytes(raw)
+        return self.put_bytes(raw, publication=publication)
 
     def read_json(self, digest: str) -> Any:
         return _strict_json(self.read_bytes(digest))

@@ -3,11 +3,15 @@ from copy import deepcopy
 import json
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import admission, explorer, policy_revision, study_suite
 from quanto.ledger import hash_bytes, hash_json
 from quanto.provenance import MAX_REQUEST_BYTES, Provenance, ProvenanceError
 from quanto.study_suite import inspect_run, register_suite, run_suite, validate_membership
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 @pytest.fixture

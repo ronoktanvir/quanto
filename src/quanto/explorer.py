@@ -391,7 +391,7 @@ def _code_identity() -> dict:
     lock = directory.parents[1] / "uv.lock"
     return {"sources": {name: hash_bytes((directory / name).read_bytes())
                          for name in ("research.py", "event_engine.py", "explorer.py", "admission.py",
-                                      "alpaca_data.py", "alpaca_actions.py", "provenance.py", "ledger.py",
+                                      "alpaca_data.py", "alpaca_actions.py", "provenance.py", "ledger.py", "evaluation_registry.py",
                                       "policy_revision.py", "study_suite.py")},
             "dependency_lock_sha256": hash_bytes(lock.read_bytes()) if lock.is_file() else None,
             "entrypoint_bytecode_sha256": _function_identity(run_backtest),

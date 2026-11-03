@@ -4,9 +4,13 @@ import json
 import sqlite3
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.failure_memory import FailureMemory, FailureMemoryError, MAX_RESULTS, MAX_SCAN
 from quanto.provenance import Provenance
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 def memory(store, **overrides):

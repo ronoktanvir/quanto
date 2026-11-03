@@ -9,11 +9,15 @@ from decimal import Decimal, localcontext
 import json
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import admission, research_comparison as comparison, study_suite
 from quanto.ledger import hash_bytes
 from quanto.provenance import Provenance, ProvenanceError
 from test_admission import regular_way_fixture, study
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 def rows(equity=("100", "90", "80"), fees=("0", "1", "2"), benchmark=None):

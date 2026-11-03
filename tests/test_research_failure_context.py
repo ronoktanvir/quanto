@@ -3,6 +3,8 @@ from copy import deepcopy
 import json
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import admission, study_suite
 from quanto.failure_memory import FailureMemory
@@ -12,6 +14,8 @@ from quanto.research_failure_context import (
     FailureContextError, retrieve_failure_basis, revalidate_failure_context, verify_failure_context,
 )
 from test_admission import regular_way_fixture, study
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 @pytest.fixture

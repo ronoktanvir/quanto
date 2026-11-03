@@ -5,6 +5,8 @@ from hashlib import sha256
 import json
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.research_packets import (
     FAILURE_ARTIFACT_STATES, FAILURE_CODES, FAILURE_FIELDS, FAILURE_RELATIONS,
@@ -13,6 +15,8 @@ from quanto.research_packets import (
     packet_messages, parse_role_output, project_role_output, validate_packet, validate_projection,
 )
 from quanto.research_workflow import ROLES
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 PREDICATE = "cost_ending_equity_nonincreasing"

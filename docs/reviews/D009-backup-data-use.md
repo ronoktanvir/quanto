@@ -15,3 +15,13 @@ Before a real external copy, the selected payload needs an explicit use review c
 The required next evidence is the applicable account/exchange terms addressing personal retention and external encrypted storage, or clarification from the provider if those terms leave the use unresolved. Do not contact the provider without the owner's explicit messaging authorization. Any omission from the eventual archive must be recorded and assessed for whether the remaining copy can actually recover the research state. Excluding essential evidence cannot produce a complete-recovery claim.
 
 This report changes no acquisition entitlement, budget, source license, upload permission or trading authority. It does not replace the broader Stage B key-custody, capture, verification and isolated-restore gates in D009.
+
+## Additional customer-agreement evidence
+
+At 2026-11-03T00:45:42Z the lead retrieved Alpaca's current public customer agreement, whose page footer identifies V26.2026.07. Section 30, PDF page 16, makes reproduction, distribution, sale and commercial exploitation of market data subject to written consent. This is broader language than the earlier general-website terms alone, so those terms cannot establish backup permission by themselves. The document also incorporates applicable exchange agreements. [Alpaca Customer Agreement](https://files.alpaca.markets/disclosures/library/AcctAppMarginAndCustAgmt.pdf)
+
+The selected account's applicable agreements or written permissions remain unverified. The public document does not specifically resolve this owner-controlled encrypted recovery arrangement; no claim is made that every private backup is prohibited. Both exchange-document links again returned 403. A provider clarification may resolve the uncertainty, but no message has been sent. Offline implementation continues; project transfer remains gated on the existing selected-use review.
+
+The public PDF was retained privately for reproducible review: 478,094 bytes, SHA-256 `d086d69f063bba1e9693fffbb3185c4469b24b47bda79f587053bd771580fcf6`. It is not committed to the repository. No account credentials or project data were transmitted during this public-source check.
+
+The owner chose to contact Alpaca personally, and the requested email wording was provided. No email or external draft was sent or created on their behalf. A provider response remains pending.

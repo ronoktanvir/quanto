@@ -233,6 +233,111 @@ def test_historical_availability_in_unsupported_basis_does_not_invent_current_ro
     assert not {"e" * 64, "f" * 64} & {edge["digest"] for edge in report["edges"]}
 
 
+def packet_fixture(store, *, producer, role="director", modern=False, row=True,
+                   workflow=closure.PACKET_WORKFLOW_SOURCE, mutate=None, wrong_code=False):
+    identity = {"sources": {"research_broker.py": producer, "research_workflow.py": workflow},
+                "python": "3.11.9", "implementation": "CPython"}
+    configuration = store.put_json({"code_identity": identity, "synthetic": True})
+    submission = store.begin("research_broker", {"fixture": True})
+    if row:
+        store.journal.connection.execute("CREATE TABLE research_broker_runs (submission_id TEXT PRIMARY KEY, "
+            "run_key TEXT, workflow_run_id TEXT, configuration_sha256 TEXT, code_sha256 TEXT)")
+        store.journal.connection.execute("INSERT INTO research_broker_runs VALUES (?,?,?,?,?)",
+            (submission, "fixture", "fixture-workflow", configuration, "f" * 64 if wrong_code else sha(identity)))
+    value = {"parent_submission_id": submission, "assignment_id": "fixture-assignment", "role": role,
+             "fence": 1, "request_id": "fixture-request", "configuration_sha256": configuration,
+             "packet_sha256": store.put_json({"fixture": "packet"}),
+             "verification_sha256": store.put_json({"fixture": "verification"})}
+    if modern:
+        value.update(failure_context_sha256=store.put_json({"fixture": "context"}),
+                     failure_basis_sha256=None if role == "director" else store.put_json({"fixture": "basis"}))
+    if mutate:
+        mutate(value)
+    store.journal.append_event("workflow_broker_packet_bound", value)
+    return value
+
+
+@pytest.mark.parametrize("producer", [key for key, value in closure.PACKET_PRODUCERS.items() if value == "legacy_038"])
+def test_bound_historical_packet_uses_recorded_producer_without_modern_evidence(tmp_path, producer):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        payload = packet_fixture(store, producer=producer)
+    report = inspect(*captured(source, tmp_path))
+    assert "legacy_packet_missing_modern_failure_evidence" in reasons(report)
+    assert "packet_profile_origin_unresolved" not in reasons(report)
+    assert {payload[field] for field in closure.PACKET_BASE} <= {edge["digest"] for edge in report["edges"]}
+    assert all(report[field] is False for field in closure.FLAGS)
+
+
+CURRENT_PACKET_PRODUCER = next(key for key, value in closure.PACKET_PRODUCERS.items() if value == "current_9ed")
+
+
+@pytest.mark.parametrize("role", ["director", "hypothesis", "engineer", "data_critic", "statistical_critic", "quality", "scope"])
+def test_bound_current_packet_retains_every_reference_and_narrow_nullable_condition(tmp_path, role):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        payload = packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, role=role)
+    report = inspect(*captured(source, tmp_path))
+    assert "legacy_packet_missing_modern_failure_evidence" not in reasons(report)
+    assert "packet_profile_origin_unresolved" not in reasons(report)
+    assert "event_binding_semantics_not_checked" in reasons(report)
+    expected = {payload[field] for field in closure.PACKET_BASE | closure.PACKET_FAILURE if payload[field] is not None}
+    assert expected <= {edge["digest"] for edge in report["edges"]}
+    assert report["full_recovery_accepted"] is False
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda d: (d.pop("failure_context_sha256"), d.pop("failure_basis_sha256")),
+    lambda d: d.pop("failure_context_sha256"),
+    lambda d: d.pop("failure_basis_sha256"),
+    lambda d: d.pop("verification_sha256"),
+    lambda d: d.update(failure_context_sha256=None),
+    lambda d: d.update(failure_basis_sha256=d["verification_sha256"]),
+    lambda d: d.update(role="engineer"),
+    lambda d: d.update(fence=True),
+    lambda d: d.update(extra_sha256="f" * 64),
+])
+def test_known_current_packet_cannot_downgrade_or_relax_required_shape(tmp_path, mutate):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, mutate=mutate)
+    with pytest.raises(closure.ClosureError):
+        inspect(*captured(source, tmp_path))
+
+
+@pytest.mark.parametrize("mutate", [lambda d: d.pop("verification_sha256"),
+    lambda d: d.update(failure_context_sha256=d["packet_sha256"], failure_basis_sha256=None)])
+def test_known_legacy_packet_must_match_its_exact_reference_profile(tmp_path, mutate):
+    source = source_store(tmp_path)
+    producer = next(key for key, value in closure.PACKET_PRODUCERS.items() if value == "legacy_038")
+    with Provenance(source) as store:
+        packet_fixture(store, producer=producer, mutate=mutate)
+    with pytest.raises(closure.ClosureError):
+        inspect(*captured(source, tmp_path))
+
+
+@pytest.mark.parametrize("options", [{"producer": "e" * 64},
+    {"producer": CURRENT_PACKET_PRODUCER, "row": False},
+    {"producer": CURRENT_PACKET_PRODUCER, "workflow": "e" * 64}])
+def test_unknown_packet_origin_never_becomes_verified_legacy_from_keys(tmp_path, options):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        packet_fixture(store, **options)
+    report = inspect(*captured(source, tmp_path))
+    assert "packet_profile_origin_unresolved" in reasons(report)
+    assert "unbound_packet_missing_modern_failure_evidence" in reasons(report)
+    assert "legacy_packet_missing_modern_failure_evidence" not in reasons(report)
+    assert report["full_recovery_accepted"] is False
+
+
+def test_packet_configuration_identity_must_match_registered_code_hash(tmp_path):
+    source = source_store(tmp_path)
+    with Provenance(source) as store:
+        packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, wrong_code=True)
+    with pytest.raises(closure.ClosureError, match="^event_producer_binding_mismatch$"):
+        inspect(*captured(source, tmp_path))
+
+
 def test_unknown_schema_event_submission_and_orphan_are_explicit(tmp_path):
     source = source_store(tmp_path)
     with Provenance(source) as store:

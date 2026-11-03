@@ -18,7 +18,7 @@ D008 now supplies local issued assignments, fenced stage transitions, exact hand
 
 Freeze specifications, gate final evaluation, track exposure, and prevent misleading pass labels. Add durable scheduling, stale worker fencing, bounded retries, artifact reconciliation, backup restore, operator dashboard, and unattended-run evidence.
 
-D009 Stage A has verified one 10 GB Runpod STANDARD destination and an actual encrypted synthetic round trip. Daily read-only cost/health checking is scheduled; first billing and scheduled execution remain unobserved. Stage B now needs permanent off-Mac key and account recovery, a consistent allowlisted project capture with source-use rights, and an isolated downloaded restore. Stage C separately needs external pre/post-effect records and a trustworthy freshness boundary; Runpod lacks Object Lock/versioning. A working transfer path does not establish usable recovery or unattended operation.
+D009 Stage A has verified one 10 GB Runpod STANDARD destination and an actual encrypted synthetic round trip. The first scheduled read-only check passed with nine posted billing records (approximately USD0.00875); tax remains unverified. The independently reviewed offline research-store tool now passed one actual local capture/inspection of40 tables and 229 objects. Stage B still needs complete typed evidence closure and required runtime/source material, selected-use rights, permanent off-Mac key/account recovery, encrypted transfer and an isolated downloaded restore. Stage C separately needs external pre/post-effect records and a trustworthy freshness boundary; Runpod lacks Object Lock/versioning. A working transfer path does not establish usable recovery or unattended operation.
 
 ## Paper and live execution
 

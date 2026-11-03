@@ -603,10 +603,12 @@ def module_copy(tmp_path, monkeypatch, *, dependency=False):
     raw = Path(closure.__file__).read_bytes()
     dependency_path = None
     if dependency:
-        name = "synthetic_recovery_" + suffix
-        dependency_path = tmp_path / "synthetic_recovery.py"
-        load(name, dependency_path, Path(recovery.__file__).read_bytes())
-        raw = raw.replace(b"from quanto import recovery", ("import " + name + " as recovery").encode())
+        role = "recovery_lineage" if dependency == "lineage" else "recovery"
+        original = closure.recovery_lineage if dependency == "lineage" else recovery
+        name = "synthetic_" + role + "_" + suffix
+        dependency_path = tmp_path / ("synthetic_" + role + ".py")
+        load(name, dependency_path, Path(original.__file__).read_bytes())
+        raw = raw.replace(("from quanto import " + role + "\n").encode(), ("import " + name + " as " + role + "\n").encode())
     path = tmp_path / "synthetic_closure.py"
     return load("synthetic_closure_" + suffix, path, raw), path, dependency_path
 
@@ -661,3 +663,25 @@ def test_loaded_constant_change_during_inspection_refuses(tmp_path, monkeypatch)
     monkeypatch.setattr(os, "open", observe)
     with pytest.raises(closure.ClosureError, match="^loaded_implementation_changed$"):
         inspect(snapshot, receipt)
+
+
+def test_lineage_source_dependency_is_part_of_inspector_identity(tmp_path, monkeypatch):
+    module, _, dependency = module_copy(tmp_path, monkeypatch, dependency="lineage")
+    original = module._implementation_identity()
+    assert original["lineage_source_sha256"] == recovery._sha(dependency.read_bytes())
+    dependency.write_bytes(dependency.read_bytes() + b"\n# unloaded replacement\n")
+    with pytest.raises(module.ClosureError, match="^implementation_source_changed$"):
+        module._implementation_identity()
+
+
+def test_lineage_loaded_methods_and_profile_constants_are_fingerprinted(monkeypatch):
+    original = closure._implementation_identity()
+    with monkeypatch.context() as patch:
+        patch.setattr(closure.recovery_lineage, "BAR_SOURCES", frozenset({"f" * 64}))
+        changed = closure._implementation_identity()
+    assert changed["lineage_loaded_sha256"] != original["lineage_loaded_sha256"]
+    assert changed["lineage_source_sha256"] == original["lineage_source_sha256"]
+    with monkeypatch.context() as patch:
+        patch.setattr(closure.recovery_lineage.Lineage, "page", lambda *args, **kwargs: None)
+        changed = closure._implementation_identity()
+    assert changed["lineage_loaded_sha256"] != original["lineage_loaded_sha256"]

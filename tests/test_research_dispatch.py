@@ -5,6 +5,8 @@ import json
 import threading
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import provider
 from quanto.ledger import Journal, LedgerError, hash_bytes
@@ -12,6 +14,8 @@ from quanto.provenance import Provenance
 from quanto.research_dispatch import ResearchDispatcher, _BorrowedAtomicJournal
 from quanto.research_packets import PREDICATES, SYSTEM_PROMPT
 from quanto.research_workflow import ResearchWorkflow, ROLES, WorkflowError
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 class Clock:

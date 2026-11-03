@@ -13,6 +13,7 @@ import threading
 import time
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
 
 from quanto import recovery
 from quanto.ledger import Journal
@@ -21,9 +22,10 @@ from quanto import study_suite
 
 
 @pytest.fixture
-def store_paths(tmp_path):
+def store_paths(tmp_path, synthetic_access):
     source = tmp_path / "source"
     source.mkdir(mode=0o700)
+    synthetic_access.bind(source)
     with Provenance(source) as store:
         live = store.put_json({"evidence_kind": "synthetic_fixture", "value": "invented"})
         submission = store.begin("synthetic_capture", {"not_stored": "request digest only"})

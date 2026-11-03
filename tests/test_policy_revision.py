@@ -4,12 +4,16 @@ import json
 from pathlib import Path
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.ledger import canonical_json
 from quanto.policy_revision import (APPROVED_REVIEWS, FROZEN_FIELDS, PolicyRevisionError, _facts_delta,
                                     register_revision, validate_revision, validate_study)
 from quanto.provenance import Provenance, ProvenanceError
 from test_admission import evidence, DATES
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 def _plan():

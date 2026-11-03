@@ -7,11 +7,15 @@ import sqlite3
 from zoneinfo import ZoneInfo
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import explorer
 from quanto.explorer import list_exposures, register_dataset, run_submission
 from quanto.ledger import hash_bytes
 from quanto.provenance import MAX_REQUEST_BYTES, Provenance, ProvenanceError
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 MARKET = {"instrument_id": "synthetic:trend", "venue": "fixture", "currency": "USD",

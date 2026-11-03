@@ -9,9 +9,13 @@ import stat
 import threading
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.ledger import Journal, canonical_json
 from quanto.provenance import MAX_ARTIFACT_BYTES, MAX_REQUEST_BYTES, Provenance, ProvenanceError
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 def digest(raw):
@@ -344,7 +348,7 @@ def test_invalid_identifiers_cannot_escape_store(tmp_path):
 
 
 def test_new_tables_share_existing_journal_without_changing_budget_records(tmp_path):
-    (tmp_path / "runtime").mkdir()
+    (tmp_path / "runtime").mkdir(exist_ok=True)
     with Journal(tmp_path / "runtime/research.sqlite") as journal:
         journal.reserve("synthetic-reservation", 100)
         before = journal.budget_snapshot()

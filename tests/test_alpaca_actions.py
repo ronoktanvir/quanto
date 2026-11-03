@@ -5,10 +5,14 @@ import json
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import alpaca_actions as actions
 from quanto import alpaca_data as data
 from quanto.provenance import Provenance, ProvenanceError
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 KEYS = data.Credentials("fixture-paper-key-12345", "fixture-secret-key-12345")
 NOW = datetime(2025, 1, 20, tzinfo=timezone.utc)
@@ -218,12 +222,13 @@ def test_unsafe_or_malformed_tokens_fail_after_raw_storage(tmp_path, token):
     assert load(tmp_path, result)[0]["pages"]
 
 
-def test_repeated_token_and_page_cap_are_incomplete(tmp_path, monkeypatch):
+def test_repeated_token_and_page_cap_are_incomplete(tmp_path, monkeypatch, synthetic_access):
     result, calls = acquire(tmp_path, [page(token="again"), page(token="again")])
     assert result["error"] == "pagination_incomplete" and len(calls) == 2
     monkeypatch.setattr(actions, "MAX_PAGES", 1)
     root = tmp_path / "capped"
     root.mkdir()
+    synthetic_access.bind(root)
     result, calls = acquire(root, [page(token="more")])
     receipt, normalized, _ = load(root, result)
     assert result["error"] == "pagination_incomplete" and len(calls) == 1
@@ -301,14 +306,15 @@ def test_dict_is_frozen_before_clock_and_submission_hash_binds_exact_input(tmp_p
 
 
 def test_receipt_publication_failure_remains_pending(tmp_path, monkeypatch):
-    original = Provenance.put_json
+    original = Provenance.put_bytes
 
-    def fail_receipt(self, value):
-        if value.get("kind") == "actions":
+    def fail_receipt(self, raw, **kwargs):
+        value = json.loads(raw)
+        if isinstance(value, dict) and value.get("kind") == "actions":
             raise ProvenanceError("synthetic storage fault")
-        return original(self, value)
+        return original(self, raw, **kwargs)
 
-    monkeypatch.setattr(Provenance, "put_json", fail_receipt)
+    monkeypatch.setattr(Provenance, "put_bytes", fail_receipt)
     result, _ = acquire(tmp_path, [page()])
     assert result["status"] == "pending" and result["error"] == "storage_unavailable"
     with Provenance(tmp_path) as store:
@@ -350,18 +356,19 @@ def test_byte_cap_limits_transport_and_preserves_prior_page(tmp_path, monkeypatc
     assert len(load(tmp_path, result)[0]["pages"]) == 1
 
 
-def test_page_byte_cap_and_provider_record_limit(tmp_path, monkeypatch):
+def test_page_byte_cap_and_provider_record_limit(tmp_path, monkeypatch, synthetic_access):
     monkeypatch.setattr(actions, "MAX_PAGE_BYTES", 10)
     result, _ = acquire(tmp_path, [page()])
     assert result["error"] == "response_oversized" and not load(tmp_path, result)[0]["pages"]
     monkeypatch.setattr(actions, "MAX_PAGE_BYTES", 2 * 1024 * 1024)
     root = tmp_path / "rows"
     root.mkdir()
+    synthetic_access.bind(root)
     result, _ = acquire(root, [page({"cash_dividends": [{}] * 1001})])
     assert result["error"] == "response_oversized" and len(load(root, result)[0]["pages"]) == 1
 
 
-def test_total_deadline_and_one_second_spacing(tmp_path, monkeypatch):
+def test_total_deadline_and_one_second_spacing(tmp_path, monkeypatch, synthetic_access):
     ticks, times = [0.0], []
     monkeypatch.setattr(actions, "MIN_REQUEST_INTERVAL", 1.0)
     monkeypatch.setattr(actions.time, "monotonic", lambda: ticks[0])
@@ -376,6 +383,7 @@ def test_total_deadline_and_one_second_spacing(tmp_path, monkeypatch):
     assert result["status"] == "success" and times == [0, 1]
     root = tmp_path / "slow"
     root.mkdir()
+    synthetic_access.bind(root)
 
     def slow(*_):
         ticks[0] += actions.MAX_TOTAL_SECONDS + 1

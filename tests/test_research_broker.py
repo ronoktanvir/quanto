@@ -3,6 +3,8 @@ from copy import deepcopy
 import json
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import admission, research_broker, study_suite
 from quanto.ledger import Journal
@@ -11,6 +13,8 @@ from quanto.provider import HAIKU
 from quanto.research_broker import run_workflow
 from quanto.research_workflow import ROLES
 from test_admission import regular_way_fixture, study
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 @pytest.fixture

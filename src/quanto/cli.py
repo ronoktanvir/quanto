@@ -111,7 +111,21 @@ def main(argv: list[str] | None = None) -> int:
     submissions.add_argument("--limit", type=int, default=20)
     args = parser.parse_args(argv)
     root = args.root.resolve()
+    authority = None
     try:
+        guarded = {"acquire-bars", "acquire-calendar", "acquire-actions", "register-dataset",
+                   "admit-dataset", "register-split-review", "register-policy-revision",
+                   "register-suite", "run-suite", "run-research", "explore"}
+        if args.command in guarded or (args.command == "submissions" and (root / "runtime/research.sqlite").exists()):
+            from quanto.evaluation_registry import Supervisor, AccessError, current_session
+            try:
+                current_session(root)
+            except AccessError as exc:
+                if exc.reason != "authority_missing":
+                    raise
+                authority = Supervisor(root).session()
+                authority.__enter__()
+
         if args.command == "serve":
             from quanto.dashboard import serve
             serve(root, port=args.port)
@@ -179,3 +193,6 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as exc:
         print(f"Quanto: {exc}", file=sys.stderr)
         return 1
+    finally:
+        if authority is not None:
+            authority.__exit__(None, None, None)

@@ -175,6 +175,17 @@ EVENT_REFS = {
     "explorer_dataset_registered": {"manifest_sha256": "dataset"},
     "study_suite_run_registered": {"suite_sha256": "suite", "roster_sha256": "roster"},
 }
+# Versionless event names require recorded producer identity, not key-shape
+# inference. Exact public writer revisions are retained in the review plan.
+PACKET_PRODUCERS = {
+    "c59a3801d41a68811231d640bc9dbd69e8a7ce933ab855e8f011f969d4654af7": "legacy_038",
+    "d26ca8496ab50cb7536b28e2623fd4d8902d67ba3a3c7a93da9be01349924630": "legacy_038",
+    "aa4f9e93f9fc471273bf2e6c1a0d67acb74583228618cecd17aa9ec513419e34": "current_9ed",
+}
+PACKET_WORKFLOW_SOURCE = "64ca63f155a2417021bb8632673f14ec12ff7d497881aa13a95d7330911ab02b"
+PACKET_BASE = {"configuration_sha256", "packet_sha256", "verification_sha256"}
+PACKET_FAILURE = {"failure_context_sha256", "failure_basis_sha256"}
+PACKET_METADATA = {"parent_submission_id", "assignment_id", "role", "fence", "request_id"}
 DATASET_FIELDS = {
     "schema_version", "kind", "evidence_kind", "source_sha256", "bars_sha256", "market", "symbol",
     "price_basis", "sessions", "coverage_start", "coverage_end", "exposure_start", "exposure_end",
@@ -196,6 +207,7 @@ class _Reader:
         self.queue, self.visited, self.edges, self.unsupported = deque(), set(), [], set()
         self.distances, self.current_hops = {}, -1
         self.nodes, self.rows_read, self.json_items = [], 0, 0
+        self.broker_runs = None
 
     def tick(self):
         _need(time.monotonic() < self.deadline, "closure_deadline")
@@ -352,12 +364,111 @@ class _Reader:
                 continue
             data = self.parse(row["payload"])
             _need(type(data) is dict)
-            for field, role in EVENT_REFS[kind].items():
-                _need(field in data)
-                if field == "failure_basis_sha256" and data[field] is None:
-                    continue
-                self.edge(parent, field, data[field], role)
+            if kind == "workflow_broker_packet_bound":
+                self.packet_references(parent, data)
+            elif kind == "workflow_broker_failure_basis_bound":
+                self.failure_basis_references(parent, data)
+            else:
+                for field, role in EVENT_REFS[kind].items():
+                    _need(field in data)
+                    self.edge(parent, field, data[field], role)
             self.gap("event_binding_semantics_not_checked", kind)
+
+    def packet_producer(self, parent, data):
+        """Select the shared broker-event writer pair, never infer it from keys."""
+        identity = data.get("parent_submission_id")
+        if type(identity) is not str or not identity:
+            self.gap("unresolved_packet_producer_binding", parent)
+            return None
+        if self.broker_runs is None:
+            self.broker_runs = {}
+            for row in self.rows("research_broker_runs"):
+                key = row["submission_id"]
+                _need(key not in self.broker_runs, "event_producer_binding_mismatch")
+                self.broker_runs[key] = row
+        row = self.broker_runs.get(identity)
+        if row is None:
+            self.gap("unresolved_packet_producer_binding", parent)
+            return None
+        digest = data["configuration_sha256"]
+        _need(row["configuration_sha256"] == digest, "event_producer_binding_mismatch")
+        if digest in self.tombstones:
+            self.gap("unavailable_packet_producer_configuration", parent)
+            return None
+        raw = recovery._read(self.path / "objects" / (digest + ".bin"),
+                             self.limits.snapshot.object_bytes, private=True)
+        _need(recovery._sha(raw) == digest, "object_changed")
+        configuration = self.parse(raw)
+        _need(type(configuration) is dict)
+        code = configuration.get("code_identity")
+        if code is None:
+            self.gap("unsupported_packet_configuration_profile", parent)
+            return None
+        _object(code, {"sources", "python", "implementation"})
+        _need(recovery._sha(recovery._json(code)) == _digest(row["code_sha256"]),
+              "event_producer_binding_mismatch")
+        _text(code["python"])
+        _text(code["implementation"])
+        sources = code["sources"]
+        _need(type(sources) is dict and 0 < len(sources) <= 32)
+        for name, source in sources.items():
+            _text(name)
+            self.edge(digest, "code_identity/sources/" + name, source,
+                      "historical_source", "external_evidence")
+        profile = PACKET_PRODUCERS.get(sources.get("research_broker.py"))
+        if profile is None or sources.get("research_workflow.py") != PACKET_WORKFLOW_SOURCE:
+            self.gap("unsupported_packet_producer_identity", parent)
+            return None
+        return profile
+
+    def failure_basis_references(self, parent, data):
+        fields = EVENT_REFS["workflow_broker_failure_basis_bound"]
+        for field, role in fields.items():
+            _need(field in data)
+            self.edge(parent, field, data[field], role)
+        profile = self.packet_producer(parent, data)
+        _need(profile != "legacy_038", "event_producer_binding_mismatch")
+        if profile is None:
+            self.gap("failure_basis_profile_origin_unresolved", parent)
+            return
+        _object(data, {"parent_submission_id", "assignment_id", "request_id", "fence", *fields})
+        for field in ("parent_submission_id", "assignment_id", "request_id"):
+            _text(data[field])
+        _need(type(data["fence"]) is int and data["fence"] > 0)
+
+    def packet_references(self, parent, data):
+        fields = EVENT_REFS["workflow_broker_packet_bound"]
+        # These references occur in every documented generation. Even an
+        # unbound event cannot erase them or invent a missing object.
+        for field in sorted(PACKET_BASE):
+            _need(field in data)
+            self.edge(parent, field, data[field], fields[field])
+        present = PACKET_FAILURE & data.keys()
+        _need(not present or present == PACKET_FAILURE)
+        profile = self.packet_producer(parent, data)
+        if profile is not None:
+            expected = PACKET_METADATA | PACKET_BASE
+            if profile == "current_9ed":
+                expected |= PACKET_FAILURE
+            _object(data, expected)
+            for field in PACKET_METADATA - {"fence"}:
+                _text(data[field])
+            _need(type(data["fence"]) is int and data["fence"] > 0)
+            _need(data["role"] in {"director", "hypothesis", "engineer", "data_critic", "statistical_critic", "quality", "scope"})
+            if profile == "legacy_038":
+                self.gap("legacy_packet_missing_modern_failure_evidence", parent)
+            else:
+                _need((data["failure_basis_sha256"] is None) == (data["role"] == "director"))
+        else:
+            # This inventories unambiguous present references, without calling
+            # an unknown/missing producer a verified historical profile.
+            self.gap("packet_profile_origin_unresolved", parent)
+            if not present:
+                self.gap("unbound_packet_missing_modern_failure_evidence", parent)
+        for field in sorted(present):
+            if field == "failure_basis_sha256" and data[field] is None:
+                continue
+            self.edge(parent, field, data[field], fields[field])
 
     def members(self, parent, values, role):
         _need(type(values) is list and len(values) == 3)

@@ -60,3 +60,7 @@ The finite dependency inspector merged in PR13 and the accepted exact-byte mater
 D008 access-control v1 remains rejected after four independent publication/classification findings. The producer is finishing v2 and direct-transport coverage checks. No production bootstrap, protected acquisition or eligibility occurred. A separate control store requires future multi-store recovery support; this older research generation does not restore its authority.
 
 D008 v2 passed261producer cases but independent criticism found three further boundary defects. V3 is being corrected; source/clean quality remains separate and no candidate is yet accepted for protected operation.
+
+Access v3 closes the seven independently reproduced preparation-boundary findings and is committed in draft PR16. Independent criticism/scope accept its exact source; installed324-case quality passes with a preserved separate local runner failure and corrected multiprocessing-node checks. Final GitHub CI and actual controlled development rollout remain pending. No protected eligibility is granted. Acquisition/admission recovery lineage is separately implemented on codex/recovery-lineage; its current source has not yet passed independent implementation review.
+
+PR16 first-head CI exceeded the old ten-minute job limit. A separately reviewed twenty-minute allowance preserves all tests and adds duration reporting; the final exact-head result remains pending. This changes no model budget or research rule.

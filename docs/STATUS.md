@@ -50,3 +50,5 @@ The November1 America/Los_Angeles ledger retains $0.979279 settled API usage and
 ## Remaining operation
 
 Protected final-evaluation access, five persistent operational research roles, searchable failure retrieval, durable unattended research scheduling/restore, prospective paper operation, and separately credentialed execution with explicit owner activation remain required. Crypto follows US research under separate source/accounting review. The successful historical pilot verifies this bounded calculation path, not investment merit or completion of the operation.
+
+The next finite dependency-inspection contract has separate source-only criticism and scope acceptance. Implementation and independent synthetic probe preparation are in progress on `codex/recovery-closure`. It will distinguish required stored documents, inline identities, historical availability and omitted external evidence without rerunning research. No new product test, actual closure inspection or complete recovery is accepted yet.

@@ -72,8 +72,14 @@ quality and scope review. They do not establish a trading edge.
 D008 adds a [bounded development workflow](docs/RESEARCH_WORKFLOW.md): issued roles,
 authorized failure retrieval, strict model packets, shared spending controls and a
 model-selected registered calculation. Synthetic integration has been independently
-reviewed. Actual historical model operation and its trace review remain pending;
-protected evaluation and unattended research are separate unfinished stages.
+reviewed. Three actual cycles are retained; the latest reached a calculation but
+failed final scope parsing, so complete operational acceptance remains pending.
+Protected evaluation and unattended research are separate unfinished stages.
+
+The [local recovery library](docs/RECOVERY.md) now captures and verifies inert
+research snapshots. Its first actual local capture preserved 40 tables and 229
+objects. Encrypted external project backup, complete evidence closure and
+disaster-recovery acceptance remain unfinished.
 
 ## Conversations and costs
 

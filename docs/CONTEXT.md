@@ -64,3 +64,13 @@ D008 v2 passed261producer cases but independent criticism found three further bo
 Access v3 closes the seven independently reproduced preparation-boundary findings and is committed in draft PR16. Independent criticism/scope accept its exact source; installed324-case quality passes with a preserved separate local runner failure and corrected multiprocessing-node checks. Final GitHub CI and actual controlled development rollout remain pending. No protected eligibility is granted. Acquisition/admission recovery lineage is separately implemented on codex/recovery-lineage; its current source has not yet passed independent implementation review.
 
 PR16 first-head CI exceeded the old ten-minute job limit. A separately reviewed twenty-minute allowance preserves all tests and adds duration reporting; the final exact-head result remains pending. This changes no model budget or research rule.
+
+## Latest integrated checkpoint
+
+PR16 merged as `460c348f48d1a700877a71256a283652e8fcd1bb` after exact head `c99d677f09ba16e0067687400ee9205ec44e7b20` passed Checks41600879353/job125799427819: 1,619 tests plus37 subtests in1,054.34seconds, lint, CLI and repository checks. The earlier ten-minute timeout and separate local quality-runner failure remain preserved. Full CI is clean-checkout source evidence; 324 explicitly installed cases are separately attributed. Access controls are integrated preparation only: no actual bootstrap, protected acquisition/evaluation or service restart occurred.
+
+Current root branch is `codex/access-rollout`. D009 lineage stays isolated and frozen for separate criticism, installed quality and scope. No actual recovery or bootstrap controller is authorized merely by passing producer tests. The complete research operation, protected evaluation, scheduling/restore and paper/live requirements remain unfinished.
+
+The reviewed development access bootstrap executed ONCE at2026-11-03T09:39:31Z. The controlstore is legacy-unknown; two fresh children agreed on18tables,8configuration rows,1principal,1bootstrap audit and15empty tables. The lead verified private receipts/current state read-only; separate actual criticism, quality and scope accept only the safe metadata and stated attribution. All eight protected/full-rollout/recovery limitations remain false. This controller is consumed and must not be rerun.
+
+The next bounded manual D008 cycle is being planned from source; no new paid dispatch occurred. External backup rights/key/account gates still apply to backup and unattended scheduling. D009 lineage is independently accepted for integration only, pending PR18 final CI; no new actual graph has run.

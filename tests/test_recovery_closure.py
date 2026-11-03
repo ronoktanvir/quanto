@@ -8,6 +8,7 @@ import sys
 import uuid
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
 
 from quanto import recovery, recovery_closure as closure
 from quanto.provenance import Provenance
@@ -42,9 +43,11 @@ def bar_document():
             "close": 1.0, "volume": 0.0}]}
 
 
-def source_store(tmp_path):
+@pytest.fixture
+def source_store(tmp_path, synthetic_access):
     source = tmp_path / "source"
     source.mkdir(mode=0o700)
+    synthetic_access.bind(source)
     return source
 
 
@@ -119,8 +122,8 @@ def full_graph(store):
             "inline_requests": [sha(item) for item in requests]}
 
 
-def test_supported_graph_preserves_inline_identities_and_keeps_full_claims_false(tmp_path):
-    source = source_store(tmp_path)
+def test_supported_graph_preserves_inline_identities_and_keeps_full_claims_false(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         graph = full_graph(store)
         assert all(not (source / "data/objects" / (digest + ".bin")).exists() for digest in graph["inline_requests"])
@@ -144,8 +147,8 @@ def test_supported_graph_preserves_inline_identities_and_keeps_full_claims_false
     (lambda d: d.update(schema_version=2), "unsupported_schema_version"),
     (lambda d: d.update(kind="future_dataset"), "unsupported_document_kind"),
 ])
-def test_unknown_versions_and_kinds_are_incomplete_not_malformed(tmp_path, mutate, reason):
-    source = source_store(tmp_path)
+def test_unknown_versions_and_kinds_are_incomplete_not_malformed(tmp_path, source_store, mutate, reason):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store, mutate)
     report = inspect(*captured(source, tmp_path))
@@ -159,16 +162,16 @@ def test_unknown_versions_and_kinds_are_incomplete_not_malformed(tmp_path, mutat
     lambda d: d.update(bar_count=-1), lambda d: d.update(kind="study_suite"),
     lambda d: d.update(market={"unrecognized": "market"}),
 ])
-def test_malformed_supported_dataset_refuses(tmp_path, mutate):
-    source = source_store(tmp_path)
+def test_malformed_supported_dataset_refuses(tmp_path, source_store, mutate):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store, mutate)
     with pytest.raises(closure.ClosureError):
         inspect(*captured(source, tmp_path))
 
 
-def test_missing_nested_dependency_is_not_hidden_by_byte_inventory_success(tmp_path):
-    source = source_store(tmp_path)
+def test_missing_nested_dependency_is_not_hidden_by_byte_inventory_success(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store, lambda d: d.update(bars_sha256="f" * 64))
     snapshot, receipt = captured(source, tmp_path)
@@ -177,8 +180,8 @@ def test_missing_nested_dependency_is_not_hidden_by_byte_inventory_success(tmp_p
 
 
 @pytest.mark.parametrize("purged", [False, True])
-def test_nested_tombstone_retains_unavailability_without_copying_or_resurrecting(tmp_path, purged):
-    source = source_store(tmp_path)
+def test_nested_tombstone_retains_unavailability_without_copying_or_resurrecting(tmp_path, source_store, purged):
+    source = source_store
     with Provenance(source) as store:
         graph = make_dataset(store)
         store.tombstone(graph["bars"], "operator_requested")
@@ -191,8 +194,8 @@ def test_nested_tombstone_retains_unavailability_without_copying_or_resurrecting
     assert report["counts"]["tombstoned_edges"] >= 1
 
 
-def test_opaque_visit_does_not_suppress_later_dataset_visit(tmp_path):
-    source = source_store(tmp_path)
+def test_opaque_visit_does_not_suppress_later_dataset_visit(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         raw = store.put_json({"fake_sha256": "e" * 64, "kind": "study_suite", "schema_version": 1})
         bars = store.put_json(bar_document())
@@ -207,8 +210,8 @@ def test_opaque_visit_does_not_suppress_later_dataset_visit(tmp_path):
 
 
 @pytest.mark.parametrize("event", ["workflow_broker_packet_bound", "workflow_broker_failure_basis_bound"])
-def test_pending_broker_binding_roots_require_bytes_even_without_terminal_stage(tmp_path, event):
-    source = source_store(tmp_path)
+def test_pending_broker_binding_roots_require_bytes_even_without_terminal_stage(tmp_path, source_store, event):
+    source = source_store
     with Provenance(source) as store:
         value = store.put_json({"synthetic": "bound evidence"})
         payload = {field: value for field in closure.EVENT_REFS[event]}
@@ -220,8 +223,8 @@ def test_pending_broker_binding_roots_require_bytes_even_without_terminal_stage(
         inspect(*captured(source, tmp_path))
 
 
-def test_historical_availability_in_unsupported_basis_does_not_invent_current_roots(tmp_path):
-    source = source_store(tmp_path)
+def test_historical_availability_in_unsupported_basis_does_not_invent_current_roots(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         basis = store.put_json({"kind": "research_failure_basis", "schema_version": 1,
             "original": {"request_availability": {"f" * 64: "unavailable"}},
@@ -258,8 +261,8 @@ def packet_fixture(store, *, producer, role="director", modern=False, row=True,
 
 
 @pytest.mark.parametrize("producer", [key for key, value in closure.PACKET_PRODUCERS.items() if value == "legacy_038"])
-def test_bound_historical_packet_uses_recorded_producer_without_modern_evidence(tmp_path, producer):
-    source = source_store(tmp_path)
+def test_bound_historical_packet_uses_recorded_producer_without_modern_evidence(tmp_path, source_store, producer):
+    source = source_store
     with Provenance(source) as store:
         payload = packet_fixture(store, producer=producer)
     report = inspect(*captured(source, tmp_path))
@@ -273,8 +276,8 @@ CURRENT_PACKET_PRODUCER = next(key for key, value in closure.PACKET_PRODUCERS.it
 
 
 @pytest.mark.parametrize("role", ["director", "hypothesis", "engineer", "data_critic", "statistical_critic", "quality", "scope"])
-def test_bound_current_packet_retains_every_reference_and_narrow_nullable_condition(tmp_path, role):
-    source = source_store(tmp_path)
+def test_bound_current_packet_retains_every_reference_and_narrow_nullable_condition(tmp_path, source_store, role):
+    source = source_store
     with Provenance(source) as store:
         payload = packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, role=role)
     report = inspect(*captured(source, tmp_path))
@@ -297,8 +300,8 @@ def test_bound_current_packet_retains_every_reference_and_narrow_nullable_condit
     lambda d: d.update(fence=True),
     lambda d: d.update(extra_sha256="f" * 64),
 ])
-def test_known_current_packet_cannot_downgrade_or_relax_required_shape(tmp_path, mutate):
-    source = source_store(tmp_path)
+def test_known_current_packet_cannot_downgrade_or_relax_required_shape(tmp_path, source_store, mutate):
+    source = source_store
     with Provenance(source) as store:
         packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, mutate=mutate)
     with pytest.raises(closure.ClosureError):
@@ -307,8 +310,8 @@ def test_known_current_packet_cannot_downgrade_or_relax_required_shape(tmp_path,
 
 @pytest.mark.parametrize("mutate", [lambda d: d.pop("verification_sha256"),
     lambda d: d.update(failure_context_sha256=d["packet_sha256"], failure_basis_sha256=None)])
-def test_known_legacy_packet_must_match_its_exact_reference_profile(tmp_path, mutate):
-    source = source_store(tmp_path)
+def test_known_legacy_packet_must_match_its_exact_reference_profile(tmp_path, source_store, mutate):
+    source = source_store
     producer = next(key for key, value in closure.PACKET_PRODUCERS.items() if value == "legacy_038")
     with Provenance(source) as store:
         packet_fixture(store, producer=producer, mutate=mutate)
@@ -319,8 +322,8 @@ def test_known_legacy_packet_must_match_its_exact_reference_profile(tmp_path, mu
 @pytest.mark.parametrize("options", [{"producer": "e" * 64},
     {"producer": CURRENT_PACKET_PRODUCER, "row": False},
     {"producer": CURRENT_PACKET_PRODUCER, "workflow": "e" * 64}])
-def test_unknown_packet_origin_never_becomes_verified_legacy_from_keys(tmp_path, options):
-    source = source_store(tmp_path)
+def test_unknown_packet_origin_never_becomes_verified_legacy_from_keys(tmp_path, source_store, options):
+    source = source_store
     with Provenance(source) as store:
         packet_fixture(store, **options)
     report = inspect(*captured(source, tmp_path))
@@ -330,8 +333,8 @@ def test_unknown_packet_origin_never_becomes_verified_legacy_from_keys(tmp_path,
     assert report["full_recovery_accepted"] is False
 
 
-def test_packet_configuration_identity_must_match_registered_code_hash(tmp_path):
-    source = source_store(tmp_path)
+def test_packet_configuration_identity_must_match_registered_code_hash(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True, wrong_code=True)
     with pytest.raises(closure.ClosureError, match="^event_producer_binding_mismatch$"):
@@ -342,8 +345,8 @@ def test_packet_configuration_identity_must_match_registered_code_hash(tmp_path)
     (key, "refused" if profile == "legacy_038" else "current")
     for key, profile in closure.PACKET_PRODUCERS.items()
 ] + [("e" * 64, "unresolved")])
-def test_failure_basis_event_requires_its_own_compatible_recorded_producer(tmp_path, producer, expected):
-    source = source_store(tmp_path)
+def test_failure_basis_event_requires_its_own_compatible_recorded_producer(tmp_path, source_store, producer, expected):
+    source = source_store
     with Provenance(source) as store:
         packet = packet_fixture(store, producer=producer, modern=expected == "current")
         event = {field: packet[field] for field in
@@ -360,8 +363,8 @@ def test_failure_basis_event_requires_its_own_compatible_recorded_producer(tmp_p
         assert report["full_recovery_accepted"] is False
 
 
-def test_current_failure_basis_event_requires_complete_writer_shape(tmp_path):
-    source = source_store(tmp_path)
+def test_current_failure_basis_event_requires_complete_writer_shape(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         packet = packet_fixture(store, producer=CURRENT_PACKET_PRODUCER, modern=True)
         event = {field: packet[field] for field in
@@ -372,8 +375,8 @@ def test_current_failure_basis_event_requires_complete_writer_shape(tmp_path):
         inspect(*captured(source, tmp_path))
 
 
-def test_unknown_schema_event_submission_and_orphan_are_explicit(tmp_path):
-    source = source_store(tmp_path)
+def test_unknown_schema_event_submission_and_orphan_are_explicit(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         store.put_json({"kind": "explorer_dataset", "schema_version": 1, "not_really_a_dataset": True})
         store.begin("unknown_submission", {})
@@ -386,8 +389,8 @@ def test_unknown_schema_event_submission_and_orphan_are_explicit(tmp_path):
     assert not nodes(report, "dataset")
 
 
-def test_private_reply_is_not_dispatched_from_its_json_like_text(tmp_path):
-    source = source_store(tmp_path)
+def test_private_reply_is_not_dispatched_from_its_json_like_text(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         raw = store.put_json({"reply": '{"kind":"explorer_dataset","schema_version":1}', "body_sha256": "e" * 64})
         store.journal.connection.execute("CREATE TABLE research_private_responses(request_id TEXT PRIMARY KEY,artifact_sha256 TEXT NOT NULL,created_at TEXT NOT NULL)")
@@ -397,8 +400,8 @@ def test_private_reply_is_not_dispatched_from_its_json_like_text(tmp_path):
     assert not nodes(report, "dataset")
 
 
-def test_no_constructors_current_validators_or_replay_during_inspection(tmp_path, monkeypatch):
-    source = source_store(tmp_path)
+def test_no_constructors_current_validators_or_replay_during_inspection(tmp_path, source_store, monkeypatch):
+    source = source_store
     with Provenance(source) as store:
         full_graph(store)
     snapshot, receipt = captured(source, tmp_path)
@@ -415,8 +418,8 @@ def test_no_constructors_current_validators_or_replay_during_inspection(tmp_path
 
 
 @pytest.mark.parametrize("field,value", [("edges", 1), ("nodes", 1), ("json_items", 1), ("depth", 1), ("seconds", 0.000001)])
-def test_limits_refuse_bounded_work(tmp_path, field, value):
-    source = source_store(tmp_path)
+def test_limits_refuse_bounded_work(tmp_path, source_store, field, value):
+    source = source_store
     with Provenance(source) as store:
         full_graph(store)
     with pytest.raises(closure.ClosureError):
@@ -424,8 +427,8 @@ def test_limits_refuse_bounded_work(tmp_path, field, value):
 
 
 @pytest.mark.parametrize("checkpoint", ["manifest", "head"])
-def test_expected_checkpoint_required_and_mismatch_refuses(tmp_path, checkpoint):
-    source = source_store(tmp_path)
+def test_expected_checkpoint_required_and_mismatch_refuses(tmp_path, source_store, checkpoint):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store)
     snapshot, receipt = captured(source, tmp_path)
@@ -434,8 +437,8 @@ def test_expected_checkpoint_required_and_mismatch_refuses(tmp_path, checkpoint)
         inspect(snapshot, receipt)
 
 
-def test_change_after_first_verification_refuses(tmp_path, monkeypatch):
-    source = source_store(tmp_path)
+def test_change_after_first_verification_refuses(tmp_path, source_store, monkeypatch):
+    source = source_store
     with Provenance(source) as store:
         graph = make_dataset(store)
     snapshot, receipt = captured(source, tmp_path)
@@ -448,8 +451,8 @@ def test_change_after_first_verification_refuses(tmp_path, monkeypatch):
         inspect(snapshot, receipt)
 
 
-def test_public_projection_rejects_claim_promotion(tmp_path):
-    source = source_store(tmp_path)
+def test_public_projection_rejects_claim_promotion(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store)
     report = inspect(*captured(source, tmp_path))
@@ -458,8 +461,8 @@ def test_public_projection_rejects_claim_promotion(tmp_path):
         closure.public_projection(report)
 
 
-def test_launch_only_request_digest_never_promises_a_file(tmp_path):
-    source = source_store(tmp_path)
+def test_launch_only_request_digest_never_promises_a_file(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         store.journal.connection.execute("CREATE TABLE study_suite_launches(run_id TEXT,cost_bps INTEGER,request_sha256 TEXT)")
         store.journal.connection.execute("INSERT INTO study_suite_launches VALUES (?,?,?)", ("fixture", 0, "d" * 64))
@@ -469,8 +472,8 @@ def test_launch_only_request_digest_never_promises_a_file(tmp_path):
     assert not report["nodes"]
 
 
-def test_wrong_inline_member_hash_refuses_without_requiring_hash_object(tmp_path):
-    source = source_store(tmp_path)
+def test_wrong_inline_member_hash_refuses_without_requiring_hash_object(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         graph = full_graph(store)
         document = store.read_json(graph["suite"])
@@ -482,8 +485,8 @@ def test_wrong_inline_member_hash_refuses_without_requiring_hash_object(tmp_path
         inspect(*captured(source, tmp_path))
 
 
-def test_duplicate_json_keys_in_supported_object_refuse(tmp_path):
-    source = source_store(tmp_path)
+def test_duplicate_json_keys_in_supported_object_refuse(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         malformed = store.put_bytes(b'{"schema_version":1,"schema_version":1,"kind":"explorer_dataset"}')
         registration = store.begin("dataset_registration", {})
@@ -492,8 +495,8 @@ def test_duplicate_json_keys_in_supported_object_refuse(tmp_path):
         inspect(*captured(source, tmp_path))
 
 
-def test_failed_partial_raw_page_and_unknown_request_are_preserved_as_separate_roles(tmp_path):
-    source = source_store(tmp_path)
+def test_failed_partial_raw_page_and_unknown_request_are_preserved_as_separate_roles(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         page = store.put_bytes(b'not JSON, synthetic failed provider body')
         request = store.put_json({"url": "https://example.invalid/never-fetch", "source_sha256": "e" * 64})
@@ -507,8 +510,8 @@ def test_failed_partial_raw_page_and_unknown_request_are_preserved_as_separate_r
 
 
 @pytest.mark.parametrize("value", [["synthetic list"], "synthetic string", 1])
-def test_generic_ledger_results_and_findings_can_be_non_objects(tmp_path, value):
-    source = source_store(tmp_path)
+def test_generic_ledger_results_and_findings_can_be_non_objects(tmp_path, source_store, value):
+    source = source_store
     with Provenance(source) as store:
         journal = store.journal
         experiment = journal.register_experiment({}, {}, {}, "synthetic_fixture")
@@ -522,8 +525,8 @@ def test_generic_ledger_results_and_findings_can_be_non_objects(tmp_path, value)
     assert closure.public_projection(report)["supported_profiles_verified"] is False
 
 
-def test_report_does_not_depend_on_unspecified_sqlite_scan_order(tmp_path, monkeypatch):
-    source = source_store(tmp_path)
+def test_report_does_not_depend_on_unspecified_sqlite_scan_order(tmp_path, source_store, monkeypatch):
+    source = source_store
     with Provenance(source) as store:
         full_graph(store)
     snapshot, receipt = captured(source, tmp_path)
@@ -551,8 +554,8 @@ def test_report_does_not_depend_on_unspecified_sqlite_scan_order(tmp_path, monke
     ({"artifact_sha256": "ordinary note"}, {"report_sha256": 7}),
     ({"artifact_sha256": "e" * 64}, {"report_sha256": "f" * 64}),
 ])
-def test_generic_dictionary_key_spelling_never_selects_file_references(tmp_path, outcome, findings):
-    source = source_store(tmp_path)
+def test_generic_dictionary_key_spelling_never_selects_file_references(tmp_path, source_store, outcome, findings):
+    source = source_store
     with Provenance(source) as store:
         journal = store.journal
         experiment = journal.register_experiment({}, {}, {}, "synthetic_fixture")
@@ -578,8 +581,8 @@ def parent_chain(store, count):
     store.finish(submission, "success", {"manifest_sha256": parent, "artifact_refs": [parent]})
 
 
-def test_graph_hops_bound_is_separate_from_shallow_json_nesting(tmp_path):
-    source = source_store(tmp_path)
+def test_graph_hops_bound_is_separate_from_shallow_json_nesting(tmp_path, source_store):
+    source = source_store
     with Provenance(source) as store:
         parent_chain(store, 9)
     snapshot, receipt = captured(source, tmp_path)
@@ -612,8 +615,8 @@ def module_copy(tmp_path, monkeypatch, *, dependency=False):
 
 
 @pytest.mark.parametrize("dependency", [False, True])
-def test_disk_source_changed_after_import_cannot_identify_old_loaded_code(tmp_path, monkeypatch, dependency):
-    source = source_store(tmp_path)
+def test_disk_source_changed_after_import_cannot_identify_old_loaded_code(tmp_path, source_store, monkeypatch, dependency):
+    source = source_store
     with Provenance(source) as store:
         make_dataset(store)
     snapshot, receipt = captured(source, tmp_path)
@@ -643,8 +646,8 @@ def test_loaded_constants_and_frozen_defaults_have_separate_identities(monkeypat
     assert changed["recovery_loaded_sha256"] == original["recovery_loaded_sha256"]
 
 
-def test_loaded_constant_change_during_inspection_refuses(tmp_path, monkeypatch):
-    source = source_store(tmp_path)
+def test_loaded_constant_change_during_inspection_refuses(tmp_path, source_store, monkeypatch):
+    source = source_store
     with Provenance(source) as store:
         graph = make_dataset(store)
     snapshot, receipt = captured(source, tmp_path)

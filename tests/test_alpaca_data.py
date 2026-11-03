@@ -5,9 +5,13 @@ import json
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import alpaca_data as data
 from quanto.provenance import Provenance
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 KEYS = data.Credentials("fixture-paper-key-12345", "fixture-secret-key-12345")
 NOW = datetime(2025, 1, 20, tzinfo=timezone.utc)
@@ -192,12 +196,13 @@ def test_coverage_and_pagination_are_not_silently_repaired(tmp_path, responses, 
     assert result["status"] == "invalid" and result["error"] == category
 
 
-def test_page_and_byte_caps(tmp_path, monkeypatch):
+def test_page_and_byte_caps(tmp_path, monkeypatch, synthetic_access):
     monkeypatch.setattr(data, "MAX_PAGES", 1)
     result, calls = acquire(tmp_path, [page(token="more")])
     assert result["error"] == "pagination_incomplete" and len(calls) == 1
     second = tmp_path / "bytes"
     second.mkdir()
+    synthetic_access.bind(second)
     monkeypatch.setattr(data, "MAX_PAGE_BYTES", 100)
     result, calls = acquire(second, [page()])
     assert result["error"] == "response_oversized" and len(calls) == 1
@@ -307,7 +312,7 @@ def test_escaped_punctuation_in_injected_secret_is_rejected(tmp_path):
 
 
 @pytest.mark.parametrize("status", [200, 302])
-def test_production_transport_is_direct_bounded_and_never_follows_redirects(monkeypatch, status):
+def test_production_transport_is_direct_bounded_and_never_follows_redirects(monkeypatch, status, tmp_path, synthetic_access):
     calls = []
     body = bytearray(page().body)
 
@@ -346,12 +351,18 @@ def test_production_transport_is_direct_bounded_and_never_follows_redirects(monk
             calls.append(("close",))
 
     monkeypatch.setattr(data.http.client, "HTTPSConnection", Connection)
-    url = data._url(data._request(REQUEST, "bars", NOW), "bars")
+    http_root = tmp_path / "mocked-http"
+    http_root.mkdir()
+    session = synthetic_access.bind(http_root, synthetic=False)
+    request = data._request(REQUEST, "bars", NOW)
+    intent = session.acquisition("bars", request)
+    url = data._url(request, "bars")
+    permit = intent.page("GET", url)
     if status == 200:
-        assert data._dispatch("GET", url, KEYS, 30, 1024).body == page().body
+        assert data._dispatch("GET", url, KEYS, 30, 1024, permit=permit).body == page().body
     else:
         with pytest.raises(data.AcquisitionError, match="redirect_refused"):
-            data._dispatch("GET", url, KEYS, 30, 1024)
+            data._dispatch("GET", url, KEYS, 30, 1024, permit=permit)
     assert sum(call[0] == "connect_to" for call in calls) == 1
     assert calls[0][1] == "data.alpaca.markets" and calls[-1] == ("close",)
 

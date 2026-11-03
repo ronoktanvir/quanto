@@ -10,11 +10,15 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto import admission, explorer, policy_revision, study_suite
 from quanto.ledger import hash_bytes
 from quanto.provenance import Provenance
 from quanto.research import StrategySpec
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 
 @pytest.fixture

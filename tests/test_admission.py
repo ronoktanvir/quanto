@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
+
 
 from quanto.admission import admit_dataset, validate_admission, AdmissionError
 from quanto.alpaca_data import acquire_bars, acquire_calendar, Credentials, HTTPResult
@@ -12,6 +14,8 @@ from quanto.alpaca_actions import acquire_actions
 from quanto.explorer import register_dataset, run_submission, list_exposures
 from quanto.ledger import canonical_json, hash_json
 from quanto.provenance import Provenance
+
+pytestmark = pytest.mark.usefixtures("synthetic_access")
 
 CLOCK = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
 DATES = ['2024-06-03', '2024-06-04', '2024-06-05', '2024-06-06', '2024-06-07',

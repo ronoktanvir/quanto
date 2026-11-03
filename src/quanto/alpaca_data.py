@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 from quanto.ledger import canonical_json
 from quanto.provenance import Provenance, ProvenanceError
+from quanto.evaluation_registry import AccessError, EffectPermit, audit_refusal, consume_grant, request_identity
 
 NY = ZoneInfo("America/New_York")
 UTC = timezone.utc
@@ -39,7 +40,7 @@ ERRORS = {
     "request_timeout", "network_unavailable", "transport_invalid", "route_refused",
     "redirect_refused", "access_denied", "rate_limited", "provider_http_error",
     "response_oversized", "credential_reflection", "response_invalid", "coverage_invalid",
-    "pagination_incomplete", "empty_coverage", "storage_unavailable", "acquisition_failed",
+    "pagination_incomplete", "empty_coverage", "storage_unavailable", "acquisition_failed", "access_refused",
 }
 
 
@@ -239,13 +240,18 @@ def _route(method: str, url: str) -> None:
         raise AcquisitionError("route_refused")
 
 
-def _http(method: str, url: str, headers: dict, timeout: float, max_bytes: int) -> HTTPResult:
+def _http(method: str, url: str, headers: dict, timeout: float, max_bytes: int, *, grant=None) -> HTTPResult:
+    try:
+        consume_grant(grant, "provider_page", request_identity(method, url), network=True)
+    except AccessError:
+        raise AcquisitionError("access_refused", status="failed") from None
     """Direct TLS connection: no proxy, redirect handling, retry, or order route."""
     _route(method, url)
     parsed = urlsplit(url)
     deadline = time.monotonic() + timeout
-    connection = http.client.HTTPSConnection(parsed.hostname, timeout=min(15, timeout))
+    connection = None
     try:
+        connection = http.client.HTTPSConnection(parsed.hostname, timeout=min(15, timeout))
         connection.connect()
         sock = connection.sock
         if sock is None:
@@ -262,6 +268,7 @@ def _http(method: str, url: str, headers: dict, timeout: float, max_bytes: int) 
         remaining()
         response = connection.getresponse()
         if response.status != 200:
+            grant.response()
             return HTTPResult(response.status, b"")
         chunks, count = [], 0
         while True:
@@ -275,36 +282,68 @@ def _http(method: str, url: str, headers: dict, timeout: float, max_bytes: int) 
                 raise AcquisitionError("response_oversized", status="failed")
         if time.monotonic() > deadline:
             raise AcquisitionError("request_timeout", status="failed")
-        return HTTPResult(response.status, b"".join(chunks))
+        body = b"".join(chunks)
+        grant.response(body)
+        return HTTPResult(response.status, body)
+    except BaseException:
+        grant.response()
+        raise
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
 
 
 def _dispatch(method: str, url: str, keys: Credentials, timeout: float,
-              max_bytes: int, transport: Callable | None = None) -> HTTPResult:
+              max_bytes: int, transport: Callable | None = None, *, permit: EffectPermit | None = None,
+              producer=None) -> HTTPResult:
     _route(method, url)
     _checked_credentials(keys)
     headers = {"APCA-API-KEY-ID": keys.key_id, "APCA-API-SECRET-KEY": keys.secret,
                "Accept": "application/json", "User-Agent": "Quanto/0.1 personal-research"}
     try:
-        result = (transport or _http)(method, url, headers, timeout, max_bytes)
+        if type(permit) is not EffectPermit:
+            raise AccessError("authority_missing")
+        with permit.start("provider_page", request_identity(method, url)) as grant:
+            try:
+                if transport is None or transport is _http:
+                    result = _http(method, url, headers, timeout, max_bytes, grant=grant)
+                else:
+                    consume_grant(grant, "provider_page", request_identity(method, url))
+                    result = transport(method, url, headers, timeout, max_bytes)
+                    grant.response(result.body if isinstance(result, HTTPResult)
+                                   and type(result.status) is int and result.status == 200
+                                   and type(result.body) is bytes and len(result.body) <= max_bytes else None)
+            except BaseException:
+                if grant.used:
+                    grant.response()
+                raise
     except AcquisitionError:
         raise
+    except AccessError as exc:
+        audit_refusal("dispatch", exc.reason)
+        raise AcquisitionError("access_refused", status="failed") from None
     except (TimeoutError,):
         raise AcquisitionError("request_timeout", status="failed") from None
     except Exception:
         raise AcquisitionError("network_unavailable", status="failed") from None
-    if (not isinstance(result, HTTPResult) or type(result.status) is not int
-            or not 100 <= result.status <= 599 or not isinstance(result.body, bytes)):
-        raise AcquisitionError("transport_invalid", status="failed")
-    if result.status != 200:
-        category = ("redirect_refused" if 300 <= result.status < 400 else
-                    "access_denied" if result.status in (401, 403) else
-                    "rate_limited" if result.status == 429 else "provider_http_error")
-        raise AcquisitionError(category, status="failed", http_status=result.status)
-    if len(result.body) > max_bytes:
-        raise AcquisitionError("response_oversized", status="failed")
-    _safe_body(result.body, keys)
+    try:
+        if (not isinstance(result, HTTPResult) or type(result.status) is not int
+                or not 100 <= result.status <= 599 or not isinstance(result.body, bytes)):
+            raise AcquisitionError("transport_invalid", status="failed")
+        if result.status != 200:
+            category = ("redirect_refused" if 300 <= result.status < 400 else
+                        "access_denied" if result.status in (401, 403) else
+                        "rate_limited" if result.status == 429 else "provider_http_error")
+            raise AcquisitionError(category, status="failed", http_status=result.status)
+        if len(result.body) > max_bytes:
+            raise AcquisitionError("response_oversized", status="failed")
+        _safe_body(result.body, keys)
+    except AcquisitionError:
+        permit.intent.widen_unknown()
+        raise
+    permit.intent.observe_response(result.body)
+    if producer is not None:
+        producer.observed_response(permit, result.body)
     return result
 
 
@@ -395,7 +434,7 @@ def _calendar(rows, request: dict) -> list[dict]:
 
 def _url(request: dict, kind: str, token: str | None = None) -> str:
     if kind == "calendar":
-        return "https://paper-api.alpaca.markets/v2/calendar?" + urlencode(request)
+        return "https://paper-api.alpaca.markets/v2/calendar?" + urlencode({"start": request["start"], "end": request["end"]})
     start = datetime.combine(date.fromisoformat(request["start"]), day_time(), NY)
     end = datetime.combine(date.fromisoformat(request["end"]) + timedelta(days=1), day_time(), NY)
     query = {**BAR_FIXED, "adjustment": request["adjustment"], "start": start.astimezone(UTC).isoformat(),
@@ -404,6 +443,113 @@ def _url(request: dict, kind: str, token: str | None = None) -> str:
     if token is not None:
         query["page_token"] = token
     return "https://data.alpaca.markets/v2/stocks/" + request["symbol"] + "/bars?" + urlencode(query)
+
+
+def _access_refusal(store, kind, *, submission=None):
+    """Fixed ordinary record; exact denied-query/control details stay private."""
+    try:
+        if submission is None:
+            submission = store.begin(kind, {"access": "refused"})
+        store.finish(submission, "invalid", {"error": "access_refused"})
+    except (ProvenanceError, OSError, ValueError):
+        return {"submission_id": submission, "status": "pending", "error": "access_refused"}
+    return {"submission_id": submission, "status": "invalid", "error": "access_refused",
+            "research_eligible": False, "admission_status": "inspection_only"}
+
+
+def _observe_coverage(intent, raw, kind, request):
+    """Widen uncertainty before publishing an unclassifiable provider response."""
+    try:
+        body = _json(raw)
+        if kind == "bars":
+            if (not isinstance(body, dict) or set(body) != {"symbol", "bars", "next_page_token"}
+                    or body.get("symbol") != request["symbol"] or not isinstance(body.get("bars"), list)):
+                raise AcquisitionError("response_invalid")
+            _checked_token(body["next_page_token"])
+            for row in body["bars"]:
+                _bar(row, request)
+                if set(row) - {"t", "o", "h", "l", "c", "v", "n", "vw"}:
+                    raise AcquisitionError("response_invalid")
+                for key in ("n", "vw"):
+                    if key in row:
+                        _number(row[key], positive=False)
+        elif kind == "calendar":
+            _calendar(body, request)
+            if any(set(row) != {"date", "open", "close"} for row in body):
+                raise AcquisitionError("response_invalid")
+    except AcquisitionError:
+        intent.widen_unknown()
+
+
+def _checked_token(value):
+    if value is not None and (type(value) is not str or not TOKEN.fullmatch(value)):
+        raise AcquisitionError("pagination_incomplete")
+    return value
+
+
+def _publish_bytes(store, producer, role, raw):
+    publication = producer.permit(role, raw) if producer is not None else None
+    return store.put_bytes(raw, publication=publication)
+
+
+def _publish_json(store, producer, role, value):
+    if producer is None:
+        return store.put_json(value)
+    raw = canonical_json(value).encode("utf-8")
+    publication = producer.permit(role, raw)
+    return store.put_bytes(raw, publication=publication)
+
+
+def _receipt_base(submission, kind):
+    return {"schema_version": 1, "provider": "alpaca", "kind": kind,
+                    "submission_id": submission, "evidence_kind": "historical_market_data",
+                    "admission_status": "inspection_only", "research_eligible": False,
+                    "rights": {"status": "account_and_exchange_terms_not_certified",
+                               "use": "owner_authorized_private_inspection",
+                               "public_distribution": False, "external_model_transmission": False,
+                               "terms_reference": "https://files.alpaca.markets/disclosures/library/TermsAndConditions.pdf"},
+                    "source_documentation": ["https://docs.alpaca.markets/us/docs/market-data-faq",
+                                             "https://docs.alpaca.markets/us/reference/stockbars",
+                                             "https://docs.alpaca.markets/us/v1.4.2/reference/getcalendar-1"]}
+
+
+def _prepared_request(request, kind):
+    return {"method": "GET", "request": request,
+                                "url": _url(request, kind),
+                                "max_pages": MAX_PAGES if kind == "bars" else 1,
+                                "max_total_bytes": MAX_TOTAL_BYTES,
+                                "max_total_seconds": MAX_TOTAL_SECONDS}
+
+
+def _normalized(request, rows, kind):
+    coverage = {"requested_start": request["start"],
+                "requested_end": request["end"], "pagination_complete": True,
+                "calendar_status": "unverified", "corporate_actions": "unknown",
+                "historical_information": "latest_retrieved_revision_not_point_in_time"}
+    normalized = {"schema_version": 1, "evidence_kind": "historical_market_data",
+                  "kind": "daily_bars" if kind == "bars" else "exchange_calendar",
+                  "research_eligible": False, "admission_status": "inspection_only",
+                  "identity": {"provider": "alpaca", "asset_class": "us_equity",
+                               "session_timezone": "America/New_York"}, "coverage": coverage}
+    if kind == "bars":
+        coverage.update(returned_start=rows[0]["timestamp"][:10], returned_end=rows[-1]["timestamp"][:10])
+        normalized.update(price_basis=request["adjustment"], bars=rows)
+        normalized["identity"].update(symbol=request["symbol"], feed="sip", currency="USD",
+                                       symbol_mapping="disabled_asof_dash", stable_entity_id=None)
+    else:
+        coverage.update(returned_start=rows[0]["date"], returned_end=rows[-1]["date"],
+                        calendar_status="provider_calendar_received_not_independently_certified")
+        normalized["sessions"] = rows
+    return normalized
+
+
+def _receipt_limitations():
+    return ["Acquisition is not a research-admission or investment-performance result.",
+                                     "Current downloaded revisions do not establish historical information availability.",
+                                     "Calendar, corporate-action treatment, data-use rights and execution timing need admission evidence.",
+                                     "Daily OHLC uses eligible trades; the open is not certified as an executable primary auction fill.",
+                                     "Daily stock volume can include extended-hours trades excluded from daily OHLC.",
+                                     "No point-in-time universe, stable issuer mapping, or survivorship-free coverage is established."]
 
 
 def _acquire(root: Path, request: dict | str, kind: str, *, transport=None,
@@ -417,39 +563,34 @@ def _acquire(root: Path, request: dict | str, kind: str, *, transport=None,
             if not isinstance(request, (dict, str)):
                 raise ValueError("unrecordable")
             frozen_request = canonical_json(request) if isinstance(request, dict) else request
-            submission = store.begin("alpaca_" + kind, frozen_request)
+            if len(frozen_request.encode("utf-8")) > MAX_REQUEST_BYTES:
+                raise ValueError("unrecordable")
         except (ProvenanceError, ValueError, TypeError, RecursionError, OverflowError):
             return {"submission_id": None, "status": "rejected", "error": "request_unrecordable"}
-        pages, rows, refs = [], [], []
-        normalized_request = None
-        manifest = {"schema_version": 1, "provider": "alpaca", "kind": kind,
-                    "submission_id": submission, "evidence_kind": "historical_market_data",
-                    "admission_status": "inspection_only", "research_eligible": False,
-                    "rights": {"status": "account_and_exchange_terms_not_certified",
-                               "use": "owner_authorized_private_inspection",
-                               "public_distribution": False, "external_model_transmission": False,
-                               "terms_reference": "https://files.alpaca.markets/disclosures/library/TermsAndConditions.pdf"},
-                    "source_documentation": ["https://docs.alpaca.markets/us/docs/market-data-faq",
-                                             "https://docs.alpaca.markets/us/reference/stockbars",
-                                             "https://docs.alpaca.markets/us/v1.4.2/reference/getcalendar-1"]}
+        preflight_error, normalized_request, producer = None, None, None
         started = time.monotonic()
         try:
             now = _utc(clock)
+            prepared_request = _request(frozen_request, kind, now)
+            keys = _checked_credentials(credentials) if credentials is not None else local_credentials(root)
+            _safe_body(json.dumps(prepared_request).encode(), keys)
+            access_intent = store.access.acquisition(kind, prepared_request)
+            producer = store.access.supervisor.producer(access_intent, "alpaca_" + kind)
+            normalized_request = prepared_request
+        except AccessError:
+            return _access_refusal(store, "alpaca_" + kind)
+        except AcquisitionError as exc:
+            preflight_error = exc
+        submission = store.begin("alpaca_" + kind, frozen_request)
+        pages, rows, refs = [], [], []
+        manifest = _receipt_base(submission, kind)
+        try:
+            if preflight_error is not None:
+                raise preflight_error
             manifest["started_at"] = now.isoformat()
             manifest["normalizer_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-            normalized_request = _request(frozen_request, kind, now)
-            keys = _checked_credentials(credentials) if credentials is not None else local_credentials(root)
-            try:
-                _safe_body(json.dumps(normalized_request).encode(), keys)
-            except AcquisitionError:
-                normalized_request = None
-                raise
-            request_manifest = {"method": "GET", "request": normalized_request,
-                                "url": _url(normalized_request, kind),
-                                "max_pages": MAX_PAGES if kind == "bars" else 1,
-                                "max_total_bytes": MAX_TOTAL_BYTES,
-                                "max_total_seconds": MAX_TOTAL_SECONDS}
-            request_hash = store.put_json(request_manifest)
+            request_manifest = _prepared_request(normalized_request, kind)
+            request_hash = _publish_json(store, producer, "request", request_manifest)
             refs.append(request_hash)
             manifest["request_sha256"] = request_hash
             store.journal.append_event("acquisition_request_prepared", {
@@ -466,11 +607,12 @@ def _acquire(root: Path, request: dict | str, kind: str, *, transport=None,
                 url = _url(normalized_request, kind, token)
                 last_request_at = time.monotonic()
                 response = _dispatch("GET", url, keys, remaining,
-                                     min(MAX_PAGE_BYTES, MAX_TOTAL_BYTES - total), transport)
+                                     min(MAX_PAGE_BYTES, MAX_TOTAL_BYTES - total), transport,
+                                     permit=access_intent.page("GET", url), producer=producer)
                 if time.monotonic() - started > MAX_TOTAL_SECONDS:
                     raise AcquisitionError("request_timeout", status="failed")
                 total += len(response.body)
-                digest = store.put_bytes(response.body)
+                digest = _publish_bytes(store, producer, "response", response.body)
                 refs.append(digest)
                 observation = {"page": page + 1, "url": url, "retrieved_at": _utc(clock).isoformat(),
                                "http_status": 200, "raw_sha256": digest, "bytes": len(response.body)}
@@ -501,50 +643,31 @@ def _acquire(root: Path, request: dict | str, kind: str, *, transport=None,
                     raise AcquisitionError("pagination_incomplete")
             if not rows:
                 raise AcquisitionError("empty_coverage")
-            coverage = {"requested_start": normalized_request["start"],
-                        "requested_end": normalized_request["end"], "pagination_complete": True,
-                        "calendar_status": "unverified", "corporate_actions": "unknown",
-                        "historical_information": "latest_retrieved_revision_not_point_in_time"}
-            normalized = {"schema_version": 1, "evidence_kind": "historical_market_data",
-                          "kind": "daily_bars" if kind == "bars" else "exchange_calendar",
-                          "research_eligible": False, "admission_status": "inspection_only",
-                          "identity": {"provider": "alpaca", "asset_class": "us_equity",
-                                       "session_timezone": "America/New_York"}, "coverage": coverage}
-            if kind == "bars":
-                coverage.update(returned_start=rows[0]["timestamp"][:10], returned_end=rows[-1]["timestamp"][:10])
-                normalized.update(price_basis=normalized_request["adjustment"], bars=rows)
-                normalized["identity"].update(symbol=normalized_request["symbol"], feed="sip", currency="USD",
-                                               symbol_mapping="disabled_asof_dash", stable_entity_id=None)
-            else:
-                coverage.update(returned_start=rows[0]["date"], returned_end=rows[-1]["date"],
-                                calendar_status="provider_calendar_received_not_independently_certified")
-                normalized["sessions"] = rows
-            normalized_hash = store.put_json(normalized)
+            normalized = _normalized(normalized_request, rows, kind)
+            normalized_hash = _publish_json(store, producer, "normalized", normalized)
             refs.append(normalized_hash)
             manifest.update(status="success", normalized_sha256=normalized_hash,
                             row_count=len(rows), finished_at=_utc(clock).isoformat())
         except AcquisitionError as exc:
             manifest.update(status=exc.status, error=exc.category, http_status=exc.http_status)
+        except AccessError:
+            return _access_refusal(store, "alpaca_" + kind, submission=submission)
         except (ProvenanceError, OSError):
             manifest.update(status="failed", error="storage_unavailable")
         except Exception:
             manifest.update(status="failed", error="acquisition_failed")
         manifest.update(request=normalized_request, pages=pages,
-                        limitations=["Acquisition is not a research-admission or investment-performance result.",
-                                     "Current downloaded revisions do not establish historical information availability.",
-                                     "Calendar, corporate-action treatment, data-use rights and execution timing need admission evidence.",
-                                     "Daily OHLC uses eligible trades; the open is not certified as an executable primary auction fill.",
-                                     "Daily stock volume can include extended-hours trades excluded from daily OHLC.",
-                                     "No point-in-time universe, stable issuer mapping, or survivorship-free coverage is established."])
+                        limitations=_receipt_limitations())
         try:
-            receipt_hash = store.put_json(manifest)
+            receipt_hash = _publish_json(store, producer, "receipt", manifest)
             refs.append(receipt_hash)
             details = {"receipt_sha256": receipt_hash, "artifact_refs": list(dict.fromkeys(refs)),
                        "error": manifest.get("error"), "research_eligible": False}
             store.finish(submission, manifest["status"], details)
         except (ProvenanceError, OSError, ValueError):
             # The initial submission stays pending if evidence publication cannot be completed.
-            return {"submission_id": submission, "status": "pending", "error": "storage_unavailable"}
+            return {"submission_id": submission, "status": "pending",
+                    "error": "access_refused" if manifest.get("error") == "access_refused" else "storage_unavailable"}
         return {"submission_id": submission, "status": manifest["status"],
                 "receipt_sha256": receipt_hash, "normalized_sha256": manifest.get("normalized_sha256"),
                 "row_count": manifest.get("row_count", 0), "error": manifest.get("error"),

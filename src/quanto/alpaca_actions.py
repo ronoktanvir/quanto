@@ -13,6 +13,7 @@ from quanto import alpaca_data as data
 from quanto.alpaca_data import AcquisitionError, Credentials
 from quanto.ledger import canonical_json
 from quanto.provenance import Provenance, ProvenanceError
+from quanto.evaluation_registry import AccessError
 
 MAX_PAGES = 8
 MAX_PAGE_BYTES = 2 * 1024 * 1024
@@ -103,7 +104,97 @@ def _page(body, digest: str, ordinal: int) -> tuple[list[dict], list[str], str |
                          "occurrences": [{"raw_sha256": digest, "page": ordinal, "index": index}]})
             if len(rows) > PAGE_LIMIT:
                 raise AcquisitionError("response_oversized")
-    return rows, categories, body["next_page_token"]
+    return rows, categories, data._checked_token(body["next_page_token"])
+
+
+def _observe_coverage(intent, raw, request):
+    """Any unresolved/multi-party action makes the response scope unknown."""
+    try:
+        body = data._json(raw)
+        rows, categories, _ = _page(body, hashlib.sha256(raw).hexdigest(), 1)
+        if set(body) != {"corporate_actions", "next_page_token"}:
+            raise AcquisitionError("response_invalid")
+        if set(categories) - CATEGORIES:
+            raise AcquisitionError("response_invalid")
+        for row in rows:
+            record = row["record"]
+            if record.get("symbol") != request["symbol"]:
+                raise AcquisitionError("response_invalid")
+            # Complex actions can contain other parties or predecessor/child
+            # identities. Their economic scope is not certified by one symbol.
+            if row["category"] not in {"cash_dividends", "forward_splits", "reverse_splits"}:
+                raise AcquisitionError("response_invalid")
+            supported = {"id", "symbol", "ex_date", "record_date", "payable_date", "process_date"}
+            supported |= ({"rate", "special"} if row["category"] == "cash_dividends"
+                          else {"old_rate", "new_rate", "effective_date"})
+            if set(record) - supported:
+                raise AcquisitionError("response_invalid")
+            def identities(value):
+                if isinstance(value, dict):
+                    for key, child in value.items():
+                        if any(part in key.lower() for part in ("symbol", "ticker", "cusip", "isin", "issuer", "security")):
+                            if key != "symbol" or child != request["symbol"]:
+                                raise AcquisitionError("response_invalid")
+                        if isinstance(child, (dict, list)):
+                            raise AcquisitionError("response_invalid")
+                elif isinstance(value, list):
+                    raise AcquisitionError("response_invalid")
+            identities(record)
+    except AcquisitionError:
+        intent.widen_unknown()
+
+
+def _receipt_base(submission):
+    return {
+            "schema_version": 1, "provider": "alpaca", "kind": "actions",
+            "submission_id": submission, "evidence_kind": "historical_market_data",
+            "research_eligible": False, "admission_status": "inspection_only",
+            "pagination_complete": False, "normalization_status": "incomplete",
+            "coverage_assessment": "not_performed",
+            "rights": {"status": "account_and_exchange_terms_not_certified",
+                       "use": "owner_authorized_private_inspection", "public_distribution": False,
+                       "external_model_transmission": False,
+                       "terms_reference": "https://files.alpaca.markets/disclosures/library/TermsAndConditions.pdf"},
+            "source_documentation": ["https://docs.alpaca.markets/us/reference/corporateactions-1",
+                                     "https://github.com/alpacahq/cli/blob/709d11400129dc7c09b41dd05263187e15801a71/api/specs/market-data-api.json"],
+        }
+
+
+def _prepared_request(request):
+    return {"method": "GET", "request": request,
+                        "url": _url(request), "max_pages": MAX_PAGES,
+                        "max_page_bytes": MAX_PAGE_BYTES, "max_total_bytes": MAX_TOTAL_BYTES,
+                        "max_total_seconds": MAX_TOTAL_SECONDS,
+                        "min_request_interval": MIN_REQUEST_INTERVAL,
+                        "all_categories": True, "date_semantics": "process_date_envelope"}
+
+
+def _normalized(request, rows, categories):
+    coverage = {"requested_start": request["start"],
+                "requested_end": request["end"], "pagination_complete": True,
+                "date_semantics": "process_date_envelope",
+                "historical_information": "latest_retrieved_revision_not_point_in_time",
+                "economic_window_coverage": "not_assessed",
+                "empty_result": "no_records_returned_not_absence_proof" if not rows else None}
+    normalized = {"schema_version": 1, "kind": "corporate_actions",
+                  "evidence_kind": "historical_market_data", "research_eligible": False,
+                  "admission_status": "inspection_only",
+                  "identity": {"provider": "alpaca", "symbol": request["symbol"],
+                               "asset_class": "us_equity"}, "coverage": coverage,
+                  "categories_present": sorted(categories),
+                  "unknown_categories": sorted(categories - CATEGORIES), "records": rows}
+    return normalized
+
+
+def _receipt_limitations():
+    return [
+                            "Acquisition is inspection-only, not economic coverage or financial admission.",
+                            "Process-date search bounds do not certify ex/effective/pay-date coverage.",
+                            "A fully paginated empty response does not prove no relevant actions.",
+                            "Latest retrieved revisions do not reconstruct historical information availability.",
+                            "Provider delay, incomplete fields and unknown categories require admission review.",
+                            "Identity continuity, currency, dividend share basis and source rights remain unverified.",
+                        ]
 
 
 def acquire_actions(root: Path, request: dict | str, *, transport=None, clock=None,
@@ -123,49 +214,40 @@ def acquire_actions(root: Path, request: dict | str, *, transport=None, clock=No
             if not isinstance(request, (dict, str)):
                 raise ValueError("unrecordable")
             frozen = canonical_json(request) if isinstance(request, dict) else request
-            submission = store.begin("alpaca_actions", frozen)
+            if len(frozen.encode("utf-8")) > MAX_REQUEST_BYTES:
+                raise ValueError("unrecordable")
         except (ProvenanceError, ValueError, TypeError, RecursionError, OverflowError):
             return {"submission_id": None, "status": "rejected", "error": "request_unrecordable"}
-        pages, rows, refs, categories = [], [], [], set()
-        normalized_request = None
-        manifest = {
-            "schema_version": 1, "provider": "alpaca", "kind": "actions",
-            "submission_id": submission, "evidence_kind": "historical_market_data",
-            "research_eligible": False, "admission_status": "inspection_only",
-            "pagination_complete": False, "normalization_status": "incomplete",
-            "coverage_assessment": "not_performed",
-            "rights": {"status": "account_and_exchange_terms_not_certified",
-                       "use": "owner_authorized_private_inspection", "public_distribution": False,
-                       "external_model_transmission": False,
-                       "terms_reference": "https://files.alpaca.markets/disclosures/library/TermsAndConditions.pdf"},
-            "source_documentation": ["https://docs.alpaca.markets/us/reference/corporateactions-1",
-                                     "https://github.com/alpacahq/cli/blob/709d11400129dc7c09b41dd05263187e15801a71/api/specs/market-data-api.json"],
-        }
+        preflight_error, normalized_request, producer = None, None, None
         started = time.monotonic()
         try:
             now = data._utc(clock)
+            prepared_request = _request(frozen, now)
+            keys = (data._checked_credentials(credentials) if credentials is not None
+                    else data.local_credentials(root))
+            data._safe_body(canonical_json(prepared_request).encode(), keys)
+            data._safe_body(frozen.encode("utf-8"), keys)
+            access_intent = store.access.acquisition("actions", prepared_request)
+            producer = store.access.supervisor.producer(access_intent, "alpaca_actions")
+            normalized_request = prepared_request
+        except AccessError:
+            return data._access_refusal(store, "alpaca_actions")
+        except AcquisitionError as exc:
+            preflight_error = exc
+        submission = store.begin("alpaca_actions", frozen)
+        pages, rows, refs, categories = [], [], [], set()
+        manifest = _receipt_base(submission)
+        try:
+            if preflight_error is not None:
+                raise preflight_error
             manifest["started_at"] = now.isoformat()
             manifest["normalizer_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
             manifest["transport_sha256"] = hashlib.sha256(Path(data.__file__).read_bytes()).hexdigest()
-            normalized_request = _request(frozen, now)
-            keys = (data._checked_credentials(credentials) if credentials is not None
-                    else data.local_credentials(root))
-            try:
-                data._safe_body(canonical_json(normalized_request).encode(), keys)
-                data._safe_body(frozen.encode("utf-8"), keys)
-            except AcquisitionError:
-                normalized_request = None
-                raise
-            submitted_hash = store.put_bytes(frozen.encode("utf-8"))
+            submitted_hash = data._publish_bytes(store, producer, "submitted_request", frozen.encode("utf-8"))
             refs.append(submitted_hash)
             manifest["submitted_request_sha256"] = submitted_hash
-            prepared = {"method": "GET", "request": normalized_request,
-                        "url": _url(normalized_request), "max_pages": MAX_PAGES,
-                        "max_page_bytes": MAX_PAGE_BYTES, "max_total_bytes": MAX_TOTAL_BYTES,
-                        "max_total_seconds": MAX_TOTAL_SECONDS,
-                        "min_request_interval": MIN_REQUEST_INTERVAL,
-                        "all_categories": True, "date_semantics": "process_date_envelope"}
-            request_hash = store.put_json(prepared)
+            prepared = _prepared_request(normalized_request)
+            request_hash = data._publish_json(store, producer, "request", prepared)
             refs.append(request_hash)
             manifest["request_sha256"] = request_hash
             store.journal.append_event("acquisition_request_prepared", {
@@ -182,9 +264,10 @@ def acquire_actions(root: Path, request: dict | str, *, transport=None, clock=No
                 url = _url(normalized_request, token)
                 last_request_at = time.monotonic()
                 response = data._dispatch("GET", url, keys, remaining,
-                                          min(MAX_PAGE_BYTES, MAX_TOTAL_BYTES - total), transport)
+                                          min(MAX_PAGE_BYTES, MAX_TOTAL_BYTES - total), transport,
+                                          permit=access_intent.page("GET", url), producer=producer)
                 total += len(response.body)
-                digest = store.put_bytes(response.body)
+                digest = data._publish_bytes(store, producer, "response", response.body)
                 refs.append(digest)
                 observation = {"page": page + 1, "url": url, "retrieved_at": None,
                                "http_status": 200, "raw_sha256": digest, "bytes": len(response.body)}
@@ -208,25 +291,15 @@ def acquire_actions(root: Path, request: dict | str, *, transport=None, clock=No
                 seen_tokens.add(token)
                 if page + 1 == MAX_PAGES or total >= MAX_TOTAL_BYTES:
                     raise AcquisitionError("pagination_incomplete")
-            coverage = {"requested_start": normalized_request["start"],
-                        "requested_end": normalized_request["end"], "pagination_complete": True,
-                        "date_semantics": "process_date_envelope",
-                        "historical_information": "latest_retrieved_revision_not_point_in_time",
-                        "economic_window_coverage": "not_assessed",
-                        "empty_result": "no_records_returned_not_absence_proof" if not rows else None}
-            normalized = {"schema_version": 1, "kind": "corporate_actions",
-                          "evidence_kind": "historical_market_data", "research_eligible": False,
-                          "admission_status": "inspection_only",
-                          "identity": {"provider": "alpaca", "symbol": normalized_request["symbol"],
-                                       "asset_class": "us_equity"}, "coverage": coverage,
-                          "categories_present": sorted(categories),
-                          "unknown_categories": sorted(categories - CATEGORIES), "records": rows}
-            normalized_hash = store.put_json(normalized)
+            normalized = _normalized(normalized_request, rows, categories)
+            normalized_hash = data._publish_json(store, producer, "normalized", normalized)
             refs.append(normalized_hash)
             manifest.update(status="success", normalized_sha256=normalized_hash, row_count=len(rows),
                             normalization_status="complete", finished_at=data._utc(clock).isoformat())
         except AcquisitionError as exc:
             manifest.update(status=exc.status, error=exc.category, http_status=exc.http_status)
+        except AccessError:
+            return data._access_refusal(store, "alpaca_actions", submission=submission)
         except (ProvenanceError, OSError):
             manifest.update(status="failed", error="storage_unavailable")
         except Exception:
@@ -234,22 +307,16 @@ def acquire_actions(root: Path, request: dict | str, *, transport=None, clock=No
         manifest.update(request=normalized_request, pages=pages,
                         categories_present=sorted(categories),
                         unknown_categories=sorted(categories - CATEGORIES),
-                        limitations=[
-                            "Acquisition is inspection-only, not economic coverage or financial admission.",
-                            "Process-date search bounds do not certify ex/effective/pay-date coverage.",
-                            "A fully paginated empty response does not prove no relevant actions.",
-                            "Latest retrieved revisions do not reconstruct historical information availability.",
-                            "Provider delay, incomplete fields and unknown categories require admission review.",
-                            "Identity continuity, currency, dividend share basis and source rights remain unverified.",
-                        ])
+                        limitations=_receipt_limitations())
         try:
-            receipt_hash = store.put_json(manifest)
+            receipt_hash = data._publish_json(store, producer, "receipt", manifest)
             refs.append(receipt_hash)
             store.finish(submission, manifest["status"], {
                 "receipt_sha256": receipt_hash, "artifact_refs": list(dict.fromkeys(refs)),
                 "error": manifest.get("error"), "research_eligible": False})
         except (ProvenanceError, OSError, ValueError):
-            return {"submission_id": submission, "status": "pending", "error": "storage_unavailable"}
+            return {"submission_id": submission, "status": "pending",
+                    "error": "access_refused" if manifest.get("error") == "access_refused" else "storage_unavailable"}
         return {"submission_id": submission, "status": manifest["status"],
                 "receipt_sha256": receipt_hash, "normalized_sha256": manifest.get("normalized_sha256"),
                 "row_count": manifest.get("row_count", 0), "error": manifest.get("error"),

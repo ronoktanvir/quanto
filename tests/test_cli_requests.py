@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+from access_fixtures import synthetic_access as synthetic_access
 
 from quanto.cli import _request_text, main
 from quanto.provenance import Provenance
@@ -18,7 +19,7 @@ def test_submission_query_does_not_initialize_empty_workspace(tmp_path, capsys):
 @pytest.mark.parametrize('command', ['acquire-bars', 'acquire-calendar', 'acquire-actions',
                                      'admit-dataset', 'register-split-review',
                                      'register-policy-revision', 'register-suite', 'run-suite'])
-def test_malformed_json_is_recorded_before_credentials_or_network(tmp_path, capsys, command):
+def test_malformed_json_is_recorded_before_credentials_or_network(tmp_path, capsys, command, synthetic_access):
     path = tmp_path / 'invalid.json'
     marker = 'synthetic-sensitive-request-content'
     path.write_text('{"unexpected":"' + marker + '",broken')

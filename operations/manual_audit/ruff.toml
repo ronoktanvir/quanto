@@ -1,0 +1,5 @@
+extend = "../../pyproject.toml"
+
+# The independently evaluated numerical reference is restored byte for byte.
+[lint.per-file-ignores]
+"independent_oracle.py" = ["E701", "E702"]

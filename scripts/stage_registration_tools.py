@@ -51,30 +51,32 @@ def manifest_bytes(controller):
     return data
 
 
-def stage():
-    files = {name: checked_read(SOURCE / name, PINS[name]) for name in (CONTROLLER, TESTS)}
-    files["source-manifest.json"] = manifest_bytes(files[CONTROLLER])
-    runtime = ROOT / "runtime"
+def install_reviewed_files(runtime, stage_dir, files, pins):
+    if stage_dir.parent != runtime or set(files) != set(pins):
+        raise ValueError("Staging requires an exact file roster in a direct runtime subdirectory")
+    for name, data in files.items():
+        if name != Path(name).name or hashlib.sha256(data).hexdigest() != pins[name]:
+            raise ValueError("Staging requires reviewed source names and bytes")
     if any(p.is_symlink() for p in (runtime, *runtime.parents)):
         raise ValueError("Unsafe runtime directory path")
     runtime.mkdir(mode=0o700, exist_ok=True)
     info = runtime.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
         raise ValueError("The runtime directory must belong to the operator and disallow shared writes")
-    STAGE.mkdir(mode=0o700, exist_ok=True)
-    info = STAGE.lstat()
+    stage_dir.mkdir(mode=0o700, exist_ok=True)
+    info = stage_dir.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
         raise ValueError("The staging directory must belong to the operator and have mode 0700")
     # Check all existing targets before installing any missing one.
     for name in files:
-        if os.path.lexists(STAGE / name):
-            checked_read(STAGE / name, PINS[name])
-    directory_fd = os.open(STAGE, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        if os.path.lexists(stage_dir / name):
+            checked_read(stage_dir / name, pins[name])
+    directory_fd = os.open(stage_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     installed = 0
     try:
         for name, data in files.items():
-            if os.path.lexists(STAGE / name):
-                checked_read(STAGE / name, PINS[name])
+            if os.path.lexists(stage_dir / name):
+                checked_read(stage_dir / name, pins[name])
                 continue
             temporary = ".stage-" + uuid.uuid4().hex
             fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
@@ -90,10 +92,16 @@ def stage():
             finally:
                 os.unlink(temporary, dir_fd=directory_fd)
             os.fsync(directory_fd)
-            checked_read(STAGE / name, PINS[name])
+            checked_read(stage_dir / name, pins[name])
     finally:
         os.close(directory_fd)
     return installed
+
+
+def stage():
+    files = {name: checked_read(SOURCE / name, PINS[name]) for name in (CONTROLLER, TESTS)}
+    files["source-manifest.json"] = manifest_bytes(files[CONTROLLER])
+    return install_reviewed_files(ROOT / "runtime", STAGE, files, PINS)
 
 
 if __name__ == "__main__":

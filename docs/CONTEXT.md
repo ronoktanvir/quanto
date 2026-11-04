@@ -31,6 +31,6 @@ The owner handles the Alpaca backup-permission email personally; the requested t
 
 ## Current work
 
-PR17 actual-setup evidence and PR18 recovery-lineage software passed their final checks and merged. Root is on `codex/development-cycle`; the inspector is prepared in the isolated `codex/recovery-lineage-inspection` worktree. Current-code registration can reuse the exact approved evidence under strict existing validators; private input equality and bounded controller review precede any operation. No new financial assumption, paid dispatch or replay follows merely from a plan or rehearsal.
+PR19 integrated the independently reviewed recovery inventory. [Private PR20](https://github.com/ronoktanvir/quanto/pull/20) contains the reproducible registration tools and local client probe. The corrected supervisor passed independent review. The next real cycle is held because the proposed auditor accepted contradictory spending and worker identity evidence. A separate revision must reject each contradiction and still accept a valid worker before the real cycle begins.
 
 [STATUS](STATUS.md) records current outcomes and limitations. [HANDOFF](HANDOFF.md) records exact revisions, consumed operations and next actions. [ROADMAP](ROADMAP.md) and [REQUIREMENTS](REQUIREMENTS.md) preserve the full objective. Historical detail remains in [the prior context checkpoint](history/CONTEXT_2026-11-03_1036Z.md) and revision-linked reviews rather than conflicting present-tense summaries.

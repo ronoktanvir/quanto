@@ -27,7 +27,7 @@ The existing LaunchAgent supervises the local site while the Mac is awake and si
 
 [D009_POLICY](D009_POLICY.md) governs external checkpoints. Synthetic encryption/transfer and one local40table/229object capture are verified. The first finite graph remains incomplete. Acquisition/admission lineage is now integrated; the expanded actual inspection now records347nodes,61supported structures and370explicit gaps, with separate criticism, quality and scope reviews completed. Full evidence/source/runtime/control-store closure, selected-use rights, off-Mac key/account recovery, downloaded restore and freshness barriers remain gates for unattended research.
 
-The owner handles the Alpaca backup-permission email personally; the requested text has been supplied. Do not contact them. Preserve the existing recovery key and never print or replace it. The owner has not confirmed off-Mac custody, retrieved-copy verification or account recovery. Continue independent work without repeating authorization questions.
+The owner reports that Alpaca approved the requested private encrypted Runpod recovery copy of historical bars and corporate-action data. The original reply and any feed-specific conditions have not been independently inspected. [Alpaca backup clarification](reviews/D009-alpaca-backup-clarification.md). Preserve the existing recovery key and never print or replace it. The owner has not confirmed off-Mac custody, retrieved-copy verification or account recovery. Continue independent work without repeating authorization questions.
 
 ## Current work
 

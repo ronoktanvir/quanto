@@ -18,6 +18,8 @@ The accepted event-compatibility correction binds the event parent/configuration
 
 The corrected finite selector passed independent software criticism/quality after a preserved v1 finding. One new bounded actual inspection now returns an incomplete graph; [the execution record](reviews/D009-profiled-closure-actual.md) distinguishes its structural counts from full recovery. This routine D009 implementation does not change policy or authorize external transfer.
 
+The owner subsequently reported that Alpaca approved the private encrypted backup of historical bars and corporate-action data described in their request. This is source-specific evidence for Stage B manifest review. Off-Mac key and account recovery, complete capture, and isolated restore remain separate checks. [Alpaca backup clarification](reviews/D009-alpaca-backup-clarification.md).
+
 ## D008 Durable research roles and protected evaluation
 
 Status: accepted staged contract in [D008_POLICY.md](D008_POLICY.md), after five separately briefed perspectives and completed actual Fable5.1/Opus5.5 reviews through local Claude Code OAuth. Both exact model identities and one-turn terminal outcomes were observed. The reviewers received the complete proposal and explicitly attributed lead summaries; they did not inspect the full adviser reports or implementation. Full visible responses and dissent are retained in D008-fable-cli.md and D008-opus-cli.md. Shared model lineages and a common lead limit independence.

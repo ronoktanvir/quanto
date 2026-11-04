@@ -12,14 +12,14 @@ import types
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "operations/manual_audit"
 STAGE = ROOT / "runtime/development-cycle-audit-v2-preparation"
-MANIFEST_NAME = "source-manifest-110a44f9139a41ba8510cd5f0defe18b.json"
-MANIFEST_SHA = "e78ae5ee34746c7a572171006e5aaa012ba905e4b1fca44bf16ae7be3550616d"
+MANIFEST_NAME = "source-manifest-881e9cd6226e48e4b93a597f377f472b.json"
+MANIFEST_SHA = "721e3bca154f2399faa5e5af665f5a971bc861fc6516c6022666612e85992b68"
 REFERENCE_SHA = "ecb929c0a71bd5b452003d85fd8ef2a5b71c5646e3e77d6582cc11f353e042c1"
 TOOLS = {
     "audit_boundary.py": "96a3f8632666fb5229eea0c891dbdb72367fb601f45aae4c60aed34b9419418c",
     "audit_cycle.py": "95f3c8aa9adf51ce04854eaa3f77472a9c400ba73fed3267c159e63e5467550f",
     "context_checks.py": "e05dfa963cd5f880f3dea80f5a241c22aee43e1859afc8ed6bf407e446d497b4",
-    "cycle_evidence.py": "0fbb3d4e76d50b59fdf0b4f7240d77feb978a086bcdc4b35dff9c4c8eef287e6",
+    "cycle_evidence.py": "6b7c5960dc2a7cdd2f26410cb5ff03e3cd6924cb9260c5b4bedc24cf821b10bb",
     "independent_oracle.py": "54887dfae2f12430b5cdd9901c0c3ba367541f6eb4714b987ad68e08f0433ca1",
     "trace_checks.py": "42adf830b9bdd4974d60c4486e85ec0100d6421be0f306498acb1b5e6e004423",
 }

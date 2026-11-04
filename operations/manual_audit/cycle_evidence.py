@@ -777,7 +777,10 @@ def verify_allocation_prefix(db, events, cut, maxrow, *, planning_day=None):
             "allocation_after_ordinary_reserve",
         )
         upper_days[req] = reserve_day
-        purposes[req] = record["purpose"]
+        # Only the three supported purposes classify exposure. An unknown
+        # label in both mutable and journal evidence cannot exclude research.
+        if record["purpose"] in {"conversation", "operations", "research"}:
+            purposes[req] = record["purpose"]
         if r <= cut:
             before.append(row["rowid"])
     last_before = max(before, default=0)

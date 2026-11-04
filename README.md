@@ -81,6 +81,11 @@ research snapshots. Its first actual local capture preserved 40 tables and 229
 objects. Encrypted external project backup, complete evidence closure and
 disaster-recovery acceptance remain unfinished.
 
+The private repository includes the reviewed source and tests for preparing a
+current-code research registration. On the pinned Mac, the staging command
+rebuilds the accepted manifest from program source and verifies the local
+tool files. [Registration tools and reproduction instructions](operations/registration/README.md).
+
 ## Conversations and costs
 
 Council reviews use the owner's existing Claude Code terminal login for exact

@@ -1,0 +1,9 @@
+# Local client discovery
+
+The installed Claude Code 2.1.318 client discovered an invented local tool over standard input and output. The client first sent `server/discover`. The fixture returned an unsupported-method error, after which the client requested protocol version `2025-11-25` through `initialize`, sent `notifications/initialized` and listed the tools. Claude reported the fixture connected, exited successfully and left no observed fixture server process running.
+
+This behavior fits the documented compatibility resolution between modern discovery and older initialization. A server targeting this installed client can demonstrate compatibility through an actual discovery trace. [MCP standard streams and compatibility](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio).
+
+The probe used a temporary configuration directory and an invented server entry. An earlier invocation supplied the fixture with a command-line configuration flag to `mcp list`. That invocation reported no servers and recorded no traffic. The isolated user-scope configuration produced the observed connection. Claude Code documents project-local configuration as the default for a future installed server. [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp).
+
+Run `python3 examples/mcp_compatibility_probe.py` to repeat the installed-client discovery check. A separate standard-stream test invoked the invented tool and received its fixed marker. Claude Code itself was observed through tool discovery only. Both checks used synthetic fixtures and issued no model prompt. R24 still requires an authorized call through a real client that returns an actual registered research result with its evidence. [Probe source](../../examples/mcp_compatibility_probe.py) · [Wire test](../../tests/test_mcp_compatibility_probe.py).

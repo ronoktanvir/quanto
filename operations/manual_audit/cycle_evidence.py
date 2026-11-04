@@ -1,6 +1,6 @@
 """Join a trusted supervisor's prospective receipts to one journal and one complete broker return."""
 
-from datetime import datetime
+from datetime import date, datetime
 from hashlib import sha256
 import json
 import math
@@ -621,7 +621,77 @@ def check_registration(store, chain):
         )
 
 
-def verify_allocation_prefix(db, events, cut, maxrow):
+def calendar_day(value):
+    """Require an actual calendar date in the ledger's canonical YYYY-MM-DD spelling."""
+    need(type(value) is str, "allocation_calendar_day")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        raise Invalid("allocation_calendar_day") from None
+    need(value == parsed.isoformat(), "allocation_calendar_day")
+    return value
+
+
+def spending_bounds(rows, cutoff, planning_day, exact_days, upper_days, purposes):
+    """Bound research spend using row order and independently known event days.
+
+    Ordinary allocations precede their journaled reserves but need not share a
+    date. A row's uncorroborated date or purpose never excludes a material risk.
+    The bounds refer to recorded local amounts under the cooperating-host model.
+    """
+    upper = None
+    uppers = {}
+    for row in reversed(rows):
+        rid = row["rowid"]
+        req = row["request_id"]
+        known_upper = upper_days.get(req)
+        if rid <= cutoff:
+            known_upper = min(known_upper, planning_day) if known_upper else planning_day
+        if known_upper is not None:
+            upper = min(upper, known_upper) if upper else known_upper
+        uppers[rid] = upper
+    lower = None
+    minimum = maximum = ambiguous_rows = 0
+    for row in rows:
+        rid = row["rowid"]
+        req = row["request_id"]
+        exact = exact_days.get(req)
+        known_lower = exact
+        if rid > cutoff:
+            known_lower = max(known_lower, planning_day) if known_lower else planning_day
+        if known_lower is not None:
+            lower = max(lower, known_lower) if lower else known_lower
+        high = uppers[rid]
+        recorded = row["day"]
+        need(
+            (lower is None or lower <= recorded) and (high is None or recorded <= high),
+            "allocation_day_outside_event_bounds",
+        )
+        if rid > cutoff:
+            continue
+        purpose = purposes.get(req)
+        possible_purpose = purpose is None or purpose == "research"
+        possible_day = (lower is None or lower <= planning_day) and (
+            high is None or planning_day <= high
+        )
+        if not possible_purpose or not possible_day:
+            continue
+        maximum += row["amount"]
+        if purpose == "research" and (exact == planning_day or lower == high == planning_day):
+            minimum += row["amount"]
+        else:
+            ambiguous_rows += 1
+    return {
+        "planning_day": planning_day,
+        "allocation_prefix_max_rowid": cutoff,
+        "minimum_research_micro_usd": minimum,
+        "maximum_research_micro_usd": maximum,
+        "ambiguous_relevant_rows": ambiguous_rows,
+        "basis": "journal_constraints_append_order_and_recorded_local_amounts",
+    }
+
+
+def verify_allocation_prefix(db, events, cut, maxrow, *, planning_day=None):
     """Establish the maximum committed allocation row at the journal cut.
 
     Research authorizations insert reserve, dispatch and purpose allocation in
@@ -640,6 +710,13 @@ def verify_allocation_prefix(db, events, cut, maxrow):
         and all(integer(row["rowid"], 1) and integer(row["amount"], 1) for row in rows),
         "purpose_cut",
     )
+    for row in rows:
+        calendar_day(row["day"])
+    if planning_day is not None:
+        calendar_day(planning_day)
+    exact_days = {}
+    upper_days = {}
+    purposes = {}
     by_request = {row["request_id"]: row for row in rows}
     reserves = {}
     dispatches = {}
@@ -681,6 +758,8 @@ def verify_allocation_prefix(db, events, cut, maxrow):
             "cut_inside_atomic_research_authorization",
         )
         (before if position <= cut else after).append(row["rowid"])
+        exact_days[req] = upper_days[req] = row["day"]
+        purposes[req] = "research"
     for req, (position, record, occurred) in ordinary.items():
         if req not in by_request or req not in reserves:
             raise Incomplete("provider_allocation_evidence_missing")
@@ -692,6 +771,13 @@ def verify_allocation_prefix(db, events, cut, maxrow):
             and row["purpose"] == record["purpose"],
             "provider_allocation_event_join",
         )
+        reserve_day = stamp(rt).astimezone(LA).date().isoformat()
+        need(
+            calendar_day(rp["day"]) == reserve_day and row["day"] <= reserve_day,
+            "allocation_after_ordinary_reserve",
+        )
+        upper_days[req] = reserve_day
+        purposes[req] = record["purpose"]
         if r <= cut:
             before.append(row["rowid"])
     last_before = max(before, default=0)
@@ -705,6 +791,8 @@ def verify_allocation_prefix(db, events, cut, maxrow):
     if any(last_before < row["rowid"] < first_after for row in rows):
         raise Incomplete("allocation_cut_not_provable")
     need(maxrow == last_before, "incorrect_allocation_prefix")
+    if planning_day is not None:
+        return spending_bounds(rows, maxrow, planning_day, exact_days, upper_days, purposes)
 
 
 def verify_headroom(db, chain, events):
@@ -733,7 +821,13 @@ def verify_headroom(db, chain, events):
         if kind == "budget_reserved":
             req = payload["request_id"]
             need(req not in holds and integer(payload["max_micro_usd"], 1), "budget_event")
-            holds[req] = [payload["day"], payload["max_micro_usd"], None, "reserved"]
+            reserve_day = calendar_day(payload["day"])
+            need(
+                reserve_day == stamp(occurred).astimezone(LA).date().isoformat()
+                and reserve_day <= day,
+                "global_reservation_day_mismatch",
+            )
+            holds[req] = [reserve_day, payload["max_micro_usd"], None, "reserved"]
         elif kind in {"budget_settled", "budget_uncertain", "budget_overage"}:
             req = payload["request_id"]
             need(req in holds, "budget_event")
@@ -747,7 +841,7 @@ def verify_headroom(db, chain, events):
         for d, reserved, a, state in holds.values()
         if d == day
     )
-    verify_allocation_prefix(db, events, n, maxrow)
+    bounds = verify_allocation_prefix(db, events, n, maxrow, planning_day=day)
     purpose = one(
         db,
         "SELECT COALESCE(SUM(amount),0) FROM provider_allocations WHERE rowid<=? AND day=? AND purpose='research'",
@@ -762,6 +856,16 @@ def verify_headroom(db, chain, events):
         >= 2625000,
         "launch_headroom",
     )
+
+    bounds["captured_research_micro_usd"] = purpose
+    bounds["worst_case_remaining_micro_usd"] = 4000000 - bounds["maximum_research_micro_usd"]
+    chain["planning_budget_evidence"] = bounds
+    need(
+        4000000 - bounds["minimum_research_micro_usd"] >= snapshot["required_micro_usd"],
+        "insufficient_proven_purpose_headroom",
+    )
+    if bounds["worst_case_remaining_micro_usd"] < snapshot["required_micro_usd"]:
+        raise Incomplete("purpose_headroom_not_provable")
 
 
 def accounting(store, chain, run_id, fixture, parse):

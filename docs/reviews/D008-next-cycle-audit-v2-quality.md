@@ -1,44 +1,39 @@
-# D008 next-cycle auditor v2 quality
+# D008 next-cycle auditor v2r2 independent quality review
 
-**Quality withholds actual-use clearance.** Two independent fresh, complete invented traces received `verified_fixture` and exit 0 despite contradictory records. One had a launch budget from the wrong day. The other omitted 20 of 21 worker modules and supplied an arbitrary loaded-code digest. Both still passed all 282 accounting comparisons. The numerical comparisons are useful evidence about the calculation, but they cannot detect either contradiction in the operational history.
+I accept the frozen auditor for its bounded preparation scope. Across eight independently observed synthetic audit invocations, the auditor distinguished a complete trace, an incomplete publication, an impossible date, and an uncertainty large enough to defeat the USD2.625 planning requirement.
 
-## Required corrections
+## Exact candidate
 
-| Fresh end-to-end witness | What the frozen auditor accepted | Required check |
-| --- | --- | --- |
-| Planning date disagrees with every dispatch date | I changed the invented budget observation to November 2 and bound its new hash in the call-entry receipt. All seven original dispatches, their reservations and their journal events remained on November 3. The auditor returned `verified_fixture` with 282 fields. | Compare each authorization and dispatch day with the worker’s pinned Los Angeles planning day. A run that crosses its authorized day must withhold the full verdict. A later settlement can occur on a different day. |
-| Worker identity is internally consistent but wrong | In a different full trace, both before/after receipts named just the `quanto` package out of 21 compiled modules and supplied an all-zero loaded digest. The broker source identity and financial inputs remained unchanged. The auditor returned the same full-fixture verdict. | Require the exact worker module roster and a worker-specific loaded-code identity, derived from the reviewed interpreter, source, imports and guards. Reject missing, extra or changed entries. |
+I rehashed all 2,530 indexed files (68,007,282 bytes), checked their sizes and paths, and compared the six executed auditor modules, 33 product files and two supervisor/worker sources to the final manifest. The eight fixtures used separate prospective audit identities, the pinned Python 3.11.9 interpreter in isolated mode, and an empty environment.
 
-The worker-identity failure has two separable causes. The receipt checker independently accepted the one-module roster while the original loaded digest remained present, and accepted the all-zero digest while the full roster remained present. The end-to-end witness then exercised both together. I also inspected a prior **invented** real-worker receipt from the corrected supervisor quality integration. Its 21 compiled identities exactly matched this manifest, but its loaded SHA was `ca5081546178b9a74661f323f09fb9a29d9e513b32078fd7bd1fb9778cf63da9`. The auditor fixture’s loaded-manifest digest was `f0d8ec754d24063b848d606a950634ceb3e0b8588a72086e4a3c00521b47db0b`. A direct comparison with the latter would reject the real worker tested in that integration. The correction needs to reproduce the worker’s own loading sequence and then exercise one real-worker fixture receipt as a positive control.
-
-These were mutations of invented evidence before each distinct audit. The original receipt bytes, modified bytes, process results and accepted terminal hashes are retained. The cases demonstrate missing checks in the shared audit path. No actual project state was altered or inspected, and no historical operation was rerun. The separate critic has also identified a purpose-allocation prefix issue. That witness is critic-attributed and requires its own disposition.
-
-## Normal and adverse controls
-
-| Fresh prospective trace | Recorded auditor result |
+| Evidence | SHA-256 |
 | --- | --- |
-| Complete, seven publications | Exit 0 in 13.21 s. Seven settled requests, four reviews, one block and one inconclusive judgment. Three distinct oracle submissions compared 94 fields each. I reconstructed nine derivative operands from the retained child reports. |
-| Hypothesis voluntarily stopped, two publications | Exit 2 in 3.86 s. Two settled requests, no review reached and zero oracle cases. |
-| Scope response malformed, six publications | Exit 2 in 12.37 s. Six settled requests and one uncertain hold. The retained financial work received no numerical pass. |
+| Final preparation freeze | `d3c7d0c6c8ed91f68d6d31ee77c0a919493d4adc3c0dccfe7e77a1e2ba025a94` |
+| Source manifest | `721e3bca154f2399faa5e5af665f5a971bc861fc6516c6022666612e85992b68` |
+| Auditor | `95f3c8aa9adf51ce04854eaa3f77472a9c400ba73fed3267c159e63e5467550f` |
+| Cycle evidence verifier | `6b7c5960dc2a7cdd2f26410cb5ff03e3cd6924cb9260c5b4bedc24cf821b10bb` |
+| Producer evidence / public preparation report | `3eb084426f1da6cb60bf54c745cd199f49faf2a39a9b494f0285d15de419b195` / `9bb430c5fe46c8e5a0d1f78bc29156b3a6b906af52ec47966a16e3d3c38c4a39` |
+| Independent summary, eight terminal receipts and control record identities | `9734b31fc684663579c16f7822d8aa8bdb4559252c511082558bc98fea4068fa` |
 
-All three clean paths joined 54 receipt/source identities, retained false operational and investment acceptance, and reported zero actual model observations. Each used a fresh marked synthetic store, an inventoried source predecessor, real fixture processes, injected transport and the producer’s fixture supervisor/worker interface. The fixture registration child called the ordinary product registration functions and emitted the interface receipts. The actual supervisor, paid worker entrypoint and actual registration controller were outside these runs. The separate corrected supervisor quality review covers their real predispatch integration. The original early-stop generator exited 1 at invented admission before producing an audit packet. Its stderr and terminal observation are preserved. A distinct fresh early-stop fixture succeeded. The exact cause of the first generator refusal was not isolated.
+## What the auditor credited
 
-Nine independent semantic checks covered successful exact-outcome and accounting controls, refusal of stripped and extra-field outcomes, missing call-entry and lead observations, a later unbound checkpoint, mutable accounting rows moved to 1999 without their authorization events, and a changed synthetic response fingerprint. All produced their expected classifications. A real initial manifest stall was interrupted at 0.1244 seconds under a 0.12-second work allowance. A simulated cleanup wait got only the remaining 0.125 seconds, returned its exit after the deadline, and stayed `cleanup_unobserved`; an already-expired second probe issued no poll, kill or wait. These checks close the earlier timing findings within the ordinary-process boundary. They do not promise prompt termination during blocked kernel I/O.
-
-## Exact scope and retained evidence
-
-Reviewer `/root/access_v2_quality` observed checkout `a64791404adf427fd7e6343805d2fe3f25f13fe7`. All 3,604 v2 freeze entries, all 744 original v1 entries, the six auditor tools, both supervisor sources and 33 public product/dependency files matched their hashes. The manifest records 21 compiled module identities. Actual auditor invocations used the pinned Python 3.11.9 interpreter and empty requested environments. No credentials, paid calls, actual market data or real financial replay were used.
-
-| Artifact | SHA-256 |
+| Invented evidence | Independently observed result |
 | --- | --- |
-| V2 freeze / producer report | `0d29713b6e010f98f492fc5f1ca67c026300e84eaadb31385278d0f3162efd98` / `c6c1ab96c48230a8d104a2144b22e16af0bfea77576a852b17f3eded8bc3f2b4` |
-| Source manifest / auditor | `6ca9e2cd82e7eb91bbccffc85f6c78c06d7fb20b8e4f488d943a19b6396e201c` / `ba9bd68bdfe5ae266d765b7f58e0d14c9b74149b3dbe22b7b888f5e1528bacd1` |
-| Prospective evidence checker | `da4c1fe308f6f8c35eb20840c8fc438b562179411f972bb6c5af36a68ddc0d5c` |
-| Supervisor / worker source pins | `43f992b081fe7bd5f23d6163dafd5827d265630a6b3049ecf58857eaa802d830` / `9a59cb3eb37f8b6f06d17abde2a474da13fba07264bd37c634ee12a07f0cd01c` |
-| Previous v1 freeze, reverified | `3eb2ec572c1ccdc500e017d8442a1be7c5802e5f37e7b8f0eca721e9847699a4` |
-| Day mismatch / worker identity false-full records | `00b09775bf7570bef293ebfecf451b6810779249b5d2bfff00e5a4a7006d59cf` / `84d69a95a1f8f116538298263e77bb377ff4e13b0bcac079137fc1bb6935a901` |
-| Isolated worker identity checks | `23c96d2d5dfea54674c58c8d228f727f630e4c1b3ff83399322f195e62647e74` |
-| Semantic and timing checks | `9e441336847be1f591ae4955618de2cd569199979fd26971b10f6346282f225b` |
-| Aggregate quality evidence | `91114c667682b3b408c4aae59d7ef09bd919f42146bff4451f0415c53e554c52` |
+| Seven stages with four published reviews | Exit 0, `verified_fixture`. Three oracle cases compared 282 fields, with three fresh children and nine derivative operands. The blocking review remained visible. |
+| Seven stages, ordinary USD1.50 charge entered on a plausible prior day | Exit 2, incomplete. The snapshot attributed zero to research. The journal and row order allowed USD0–1.50 of research on the planning day, leaving as little as USD2.50. Zero stages or numerical results credited. |
+| Seven stages, USD1.50 charge with the same unsupported purpose label in the row and journal | Exit 2, incomplete, with the same bounds. The earlier provisional auditor accepted this exact type of evidence as full. |
+| Seven stages, plausible prior-day USD0.25 | Exit 0, `verified_fixture`. Worst-case remaining purpose headroom was USD3.75. The report retained the one ambiguous row and all 282 numerical comparisons. |
+| Malformed ordinary allocation date | Both six- and seven-stage underlying fixtures returned exit 2, refused, with zero stage or numerical credit. The separate calendar probe identified the invalid date. |
+| Six stages and malformed final scope output | Exit 2, incomplete. The auditor credited six stages, three reviews and zero financial comparisons. |
 
-All quality execution handles are terminal. Artifacts and commands are retained under ignored `runtime/development-cycle-audit-v2-quality/`. Actual launch remains gated on a corrected, independently reviewed auditor and the lead’s authorized, prospective private preflight.
+All eight process receipts recorded reaped children and matched the observed terminal exit and output hashes. Every public result retained zero actual-model observations and false operational, investment and live-execution flags.
+
+## Additional controls and retained attempts
+
+Nineteen independent budget controls covered canonical dates, future rows, contradictory date bounds, credible cross-midnight allocations, uncertain prefixes, recognized conversation/operations purposes and unknown purposes. A USD1.375 uncertain charge left exactly the required headroom and passed. One more microdollar made the outcome incomplete. A USD18 global-only hold left USD2 available and refused. Its malformed day and its valid but backdated day each refused against the reservation event's own timestamp.
+
+On the successful invented store's in-memory copy, nine outcome/receipt/accounting controls distinguished complete and stripped returns, absent evidence of call entry or outer terminal observation, a retrospective checkpoint, relocated spending and mismatched response fingerprints. A timed first manifest read expired inside the work budget. A simulated late cleanup did not earn a reaped result. A separate code-only reconstruction matched all 21 compiled modules and the loaded identity from the previously observed paused worker's synthetic receipt `9385d856df0ab7dd39d56f5c638fd7bb10d85339b0faf9c1d0086a77a7238098`. Missing or extra modules, the auditor's digest in place of the worker's, and a changed broker fingerprint all refused.
+
+Two initial launcher invocations refused a quality scratch manifest copied with mode 0644, before either audit directory was created. Restoring its source mode of 0600 allowed the unchanged packets to be evaluated. One intended-full generator stopped at five stages. The auditor accurately reported five and incomplete. The successful seven-stage generator used verified read-back of its own newly published synthetic files. The auditor always used its frozen code. Both provisional source generations and their adverse evidence remain retained. In particular, the intermediate unknown-purpose witness recorded 282 falsely credited fields before the final correction.
+
+The generator used injected transport and invented stores. This review establishes consistency of the captured local budget under the recorded journal, amounts and cooperating host assumptions. Ordinary split transactions can leave the historical allocation day uncertain. The results confer no authority to run a paid cycle and provide no evidence of investment performance, provider-wide spending, or unattended operation. The lead retains responsibility for matching installed paths and review identities before any separately authorized actual run.

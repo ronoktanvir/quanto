@@ -76,9 +76,10 @@ def inputs(tmp_path, mode="normal", *, actual_cli=False, synthetic=False):
         source = tmp_path / "fixture-source"
         package = source / "src/quanto"
         package.mkdir(parents=True)
-        (package / "__init__.py").write_text("")
-        shutil.copyfile(SOURCE / "src/quanto/evaluation_registry.py",
-                        package / "evaluation_registry.py")
+        # Retain the real authority dependency graph while substituting only
+        # the bounded CLI fixture; new imports cannot turn this into a stub.
+        for module in (SOURCE / "src/quanto").glob("*.py"):
+            shutil.copyfile(module, package / module.name)
         (package / "cli.py").write_text(FAKE_CLI)
     raw = b"{" if actual_cli else json.dumps({"mode": mode}).encode()
     request = tmp_path / "private-request.json"
@@ -288,3 +289,38 @@ def test_wall_clock_expiry_prevents_gate_release_despite_active_monotonic_clock(
     assert result["cleanup_confirmed"] and result["wall_elapsed_seconds"] >= 10
     assert not (request["attempt"] / "child-started.json").exists()
     absent(result["pid"])
+
+
+def test_attached_authority_requires_explicit_pinned_event_in_real_child(tmp_path):
+    from quanto.authority_reattachment import apply_reattachment
+    from test_authority_reattachment import fixture_store, frozen_request
+
+    request = inputs(tmp_path, actual_cli=True)
+    root = tmp_path / "invented-restarted-root"
+    root.mkdir()
+    fixture_store(root)
+    event = apply_reattachment(root, frozen_request(root))["event_sha256"]
+    request["runtime_root"] = root
+    for index, pin in enumerate((None, "f" * 64, event)):
+        case = {**request, "attempt": tmp_path / f"attached-{index}",
+                "attachment_event_sha256": pin}
+        result = runner.supervise_step(**case)
+        assert result["cleanup_confirmed"] and result["identities_unchanged"], diagnostic(result)
+        assert result["status"] == "completed", diagnostic(result)
+        assert result["exit_code"] == (1 if pin == event else 70), diagnostic(result)
+        intent = json.loads((case["attempt"] / "intent.json").read_text())
+        assert intent["attachment_event_sha256"] == pin
+        if pin == event:
+            # The real CLI reached a recorded invalid request with its pinned
+            # inherited session. It did not bootstrap or calculate a strategy.
+            assert json.loads((case["attempt"] / "stdout.bin").read_text())["status"] == "invalid"
+        else:
+            assert (case["attempt"] / "stdout.bin").read_bytes() == b""
+
+
+def test_malformed_attachment_pin_refuses_before_process_launch(tmp_path):
+    request = inputs(tmp_path)
+    result = runner.supervise_step(**request, attachment_event_sha256="not-an-event")
+    assert result["status"] == "refused" and result["reason"] == "attachment_pin_invalid"
+    assert result["cleanup_confirmed"]
+    assert not (request["attempt"] / "child-started.json").exists()

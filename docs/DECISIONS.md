@@ -1,5 +1,9 @@
 # Decision register
 
+## D012 development authority reattachment (proposed)
+
+The owner confirmed a restart after read-only preflight found a changed filesystem-device binding with preserved configuration, retained control-table prefixes and non-device file identities. [D012 proposal](D012_PROPOSAL.md) considers an explicit history-preserving administrative mapping. It is not accepted or performed; never reset exposure, spending or consumed-run records to regain access. The immediate objective remains the frozen D011 cost screen.
+
 ## D011 Finite strategy screening
 
 The owner resumed Quanto and asked agents to test strategies after costs and on unseen data. Accept one finite supervised single-instrument trend screen as the next empirical deliverable, while preserving the separate unresolved protected evaluator. The theory sheet is a topic index; original sources and verified accounting govern calculations. Five independently briefed advisers and actual Fable 5.1 / Opus 5.5 CLI critiques informed the decision. [Accepted contract and dispositions](D011_POLICY.md).

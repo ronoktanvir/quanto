@@ -2,7 +2,7 @@
 
 ## Owner-prioritized research queue
 
-Execute D011's finite, predeclared single-instrument trend screen after exact-build criticism, independent numerical/failure checks and scope review. Preserve every cost scenario and failed/unattempted slot. Use one continuous portfolio trace per candidate/cost combination and clearly label all chronological blocks as historical development evidence. Volatility sizing and reversal stay queued until their additional accounting is implemented. [Research queue](RESEARCH_QUEUE.md) · [D011 policy](D011_POLICY.md).
+Execute D011's finite, predeclared single-instrument trend screen. Exact-build criticism, independent quality, scope and clean CI have passed. First resolve the restart-related storage binding through reviewed history-preserving reattachment and finish external process supervision. Preserve every cost scenario and failed/unattempted slot. Use one continuous portfolio trace per candidate/cost combination and clearly label all chronological blocks as historical development evidence. Volatility sizing and reversal stay queued until their additional accounting is implemented. [Research queue](RESEARCH_QUEUE.md) · [D011 policy](D011_POLICY.md).
 
 Complete scoped exposure reconciliation and the isolated evaluator alongside this empirical work. A model's public historical knowledge remains a limitation. Favor a frozen future campaign when historical non-exposure cannot be established, with a reviewed sample/power plan before final access. The current development screen cannot complete the owner's unseen-data requirement.
 

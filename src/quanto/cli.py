@@ -99,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
         ("register-suite", "Register all three cost scenarios before calculation"),
         ("run-suite", "Execute a complete registered scenario roster once"),
         ("run-research", "Run one bounded model-role workflow under the daily cap; no trades"),
+        ("register-campaign", "Freeze a finite development campaign before acquisition"),
+        ("bind-campaign-data", "Bind admitted observations to a frozen campaign"),
+        ("run-campaign", "Run a frozen development campaign once; no trades"),
         ("explore", "Record and execute an eligible exploratory study"),
     ):
         command = sub.add_parser(name, help=description)
@@ -115,7 +118,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         guarded = {"acquire-bars", "acquire-calendar", "acquire-actions", "register-dataset",
                    "admit-dataset", "register-split-review", "register-policy-revision",
-                   "register-suite", "run-suite", "run-research", "explore"}
+                   "register-suite", "run-suite", "run-research", "explore",
+                   "register-campaign", "bind-campaign-data", "run-campaign"}
         if args.command in guarded or (args.command == "submissions" and (root / "runtime/research.sqlite").exists()):
             from quanto.evaluation_registry import Supervisor, AccessError, current_session
             try:
@@ -136,6 +140,17 @@ def main(argv: list[str] | None = None) -> int:
             from quanto.critic import request_review
             output = request_review(root, args.packet.read_text())
             output = {key: value for key, value in output.items() if key != "text"}
+        elif args.command in {"register-campaign", "bind-campaign-data", "run-campaign"}:
+            from quanto.research_campaign import register_campaign, bind_dataset, run_campaign
+            action = {"register-campaign": register_campaign, "bind-campaign-data": bind_dataset,
+                      "run-campaign": run_campaign}[args.command]
+            result = action(root, _request_text(args.request))
+            # Private rules and market results stay in registered local artifacts.
+            output = {key: result[key] for key in (
+                "submission_id", "status", "campaign_sha256", "binding_sha256",
+                "summary_sha256", "error_code", "complete", "all_success",
+                "evidence_kind", "investment_validation", "protected_evaluation",
+            ) if key in result}
         elif args.command == "run-research":
             from quanto.research_broker import run_workflow
             result = run_workflow(root, _request_text(args.request))

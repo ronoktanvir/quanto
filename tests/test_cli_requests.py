@@ -18,7 +18,8 @@ def test_submission_query_does_not_initialize_empty_workspace(tmp_path, capsys):
 
 @pytest.mark.parametrize('command', ['acquire-bars', 'acquire-calendar', 'acquire-actions',
                                      'admit-dataset', 'register-split-review',
-                                     'register-policy-revision', 'register-suite', 'run-suite'])
+                                     'register-policy-revision', 'register-suite', 'run-suite',
+                                     'register-campaign', 'bind-campaign-data', 'run-campaign'])
 def test_malformed_json_is_recorded_before_credentials_or_network(tmp_path, capsys, command, synthetic_access):
     path = tmp_path / 'invalid.json'
     marker = 'synthetic-sensitive-request-content'
@@ -62,3 +63,18 @@ def test_unresolved_publication_is_not_a_success_exit(tmp_path, monkeypatch, cap
     })
     assert main(['--root', str(tmp_path), 'acquire-bars', '--request', str(path)]) == 1
     assert json.loads(capsys.readouterr().out)['status'] == 'pending'
+
+
+def test_campaign_cli_releases_lifecycle_only(tmp_path, monkeypatch, capsys, synthetic_access):
+    path = tmp_path / 'request.json'
+    path.write_text('{}')
+    monkeypatch.setattr('quanto.research_campaign.run_campaign', lambda *args: {
+        'status': 'success', 'complete': True, 'investment_validation': False,
+        'protected_evaluation': False,
+        'summary': {'private_rule': 'synthetic-private-marker', 'market_values': [42]},
+    })
+    assert main(['--root', str(tmp_path), 'run-campaign', '--request', str(path)]) == 0
+    output = capsys.readouterr()
+    assert 'synthetic-private-marker' not in output.out + output.err
+    assert 'summary' not in json.loads(output.out)
+    assert json.loads(output.out)['protected_evaluation'] is False

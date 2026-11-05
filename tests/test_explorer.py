@@ -60,6 +60,40 @@ def read(root, digest):
         return store.read_json(digest)
 
 
+def test_large_continuous_trace_has_explicit_bounded_storage(tmp_path):
+    # Consecutive invented dates are an explicit fixture calendar, not market history.
+    start = datetime(2010, 1, 1, tzinfo=ZoneInfo("America/New_York"))
+    supplied = [dict(timestamp=(start + timedelta(days=i)).isoformat(), symbol="FIXTURE",
+                     open=100 + i % 11, high=112, low=99, close=101 + i % 11, volume=1000)
+                for i in range(4000)]
+    registered = register_dataset(tmp_path, registration(
+        tmp_path, supplied=supplied,
+        expected_sessions=[row["timestamp"][:10] for row in supplied]))
+    assert registered["status"] == "success"
+    outcome = run_submission(tmp_path, request(
+        registered["manifest_sha256"], lookback=10,
+        evaluation_start=supplied[10]["timestamp"][:10],
+        evaluation_end=supplied[-1]["timestamp"][:10], result_storage="bounded_large_json"))
+    assert outcome["status"] == "success", outcome
+    assert outcome["result_storage"] == "bounded_large_json"
+    with Provenance(tmp_path) as store:
+        digest = outcome["artifact_sha256"]
+        assert len(store.read_bytes(digest)) > 1024 * 1024
+        with pytest.raises(ProvenanceError):
+            store.read_json(digest)
+        result = store.read_large_json(digest)
+        assert result["frozen_request"]["result_storage"] == "bounded_large_json"
+        assert result["investment_evidence"] is False
+        assert result["evidence_kind"] == "synthetic_fixture"
+        assert len(result["engine_report"]["strategy"]["daily_equity"]) == 3990
+
+
+def test_unknown_result_storage_is_recorded_and_refused(tmp_path, dataset):
+    outcome = run_submission(tmp_path, request(dataset, result_storage="unbounded"))
+    assert outcome["status"] == "invalid"
+    assert outcome["error_code"] == "unsupported_result_storage"
+
+
 @pytest.mark.parametrize("raw,code", [
     ('{"secret":"must-not-be-stored",', "invalid_request_json"),
     ('{"a":1,"a":2}', "duplicate_request_key"),

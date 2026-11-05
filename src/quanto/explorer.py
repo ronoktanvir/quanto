@@ -533,8 +533,13 @@ def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None 
             data = _request(frozen_request)
             required = {"dataset_sha256", "study_name", "evaluation_start",
                         "evaluation_end", "specification"}
-            if not required <= set(data) or set(data) - (required | {"admission_sha256", "suite_sha256"}):
+            if not required <= set(data) or set(data) - (required | {
+                "admission_sha256", "suite_sha256", "result_storage"
+            }):
                 raise ExplorationError("invalid_study_fields")
+            large_result = "result_storage" in data
+            if large_result and data["result_storage"] != "bounded_large_json":
+                raise ExplorationError("unsupported_result_storage")
             study = _text(data["study_name"])
             digest = _ref(data["dataset_sha256"])
             manifest = _dataset(store, digest)
@@ -553,6 +558,8 @@ def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None 
                 from quanto.admission import validate_admission
                 admission = validate_admission(store, _ref(data["admission_sha256"]), digest)
                 if admission.get("policy_revision_sha256"):
+                    if large_result:
+                        raise ExplorationError("revised_policy_large_result_not_supported")
                     validate_study(store, admission["policy_revision"], data)
                     if "suite_sha256" not in data:
                         raise ExplorationError("registered_study_suite_required")
@@ -594,6 +601,8 @@ def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None 
             frozen = {"strategy": asdict(specification), "evaluation_start": start.isoformat(),
                       "evaluation_end": end.isoformat(), "initial_position": "cash",
                       "benchmark": "buy_and_hold_same_window_same_costs", "purpose": "exploratory"}
+            if large_result:
+                frozen["result_storage"] = "bounded_large_json"
             identities = {"dataset_sha256": digest, "bars_sha256": manifest["bars_sha256"],
                           "source_sha256": manifest["source_sha256"], "market": market}
             if admission is not None:
@@ -633,7 +642,8 @@ def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None 
             if _code_identity() != code:
                 raise ExplorationError("code_changed_during_execution")
             publishing = True
-            artifact = store.put_json({
+            publish_result = store.put_large_json if large_result else store.put_json
+            artifact = publish_result({
                 "schema_version": 1, "result_kind": "exploratory_result", "evidence_kind": evidence,
                 "investment_evidence": False, "dataset_sha256": digest, "frozen_request": frozen,
                 "code_identity": code, "development_policy": "entire_dataset_development_only",
@@ -651,6 +661,8 @@ def run_submission(root: Path, request: dict | str, *, suite_run_id: str | None 
                        "artifact_refs": sorted({artifact, digest, manifest["bars_sha256"], manifest["source_sha256"]}
                                                | ({data["admission_sha256"], *admission["artifact_refs"]} if admission else set())
                                                | ({data["suite_sha256"], *suite["artifact_refs"]} if suite else set()))}
+            if large_result:
+                details["result_storage"] = "bounded_large_json"
             if admission is not None:
                 details["admission_sha256"] = data["admission_sha256"]
             if suite is not None:

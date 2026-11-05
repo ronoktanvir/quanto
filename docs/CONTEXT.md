@@ -31,6 +31,10 @@ The owner reports that Alpaca approved the requested private encrypted Runpod re
 
 ## Current work
 
+Owner update, November 4: resume the build and prioritize a research queue guided by the supplied quant-theory sheet, with agents testing costs and unseen-data robustness. [D011](D011_POLICY.md) accepts a finite supervised historical screen and preserves separate protected/prospective acceptance. Five perspectives and actual signed-in Fable/Opus reviews are complete. Do not replace the empirical milestone with additional advisory reports. The first actual result must be a complete candidate/cost comparison or an observed acquisition/admission refusal. Existing data remains development-exposed; no fresh directory or parameter change resets exposure. [Queue](RESEARCH_QUEUE.md).
+
+Source work is now in the resident checkout `/Users/ronoktanvir/.codex/worktrees/strategy-research/quanto`, branch `codex/strategy-research-local`, because the Documents worktree's cloud placeholders stalled source reads. The original root and D010 branch are preserved. Production runtime remains in the original root; do not create a fresh authority store to avoid its legacy history.
+
 [Private PR20](https://github.com/ronoktanvir/quanto/pull/20) versions the manual research tools, the local MCP client probe and the verified historical cycle. After rechecking three prior registrations, source identity, worker ownership and spending, the lead ran one supervised cycle and one fresh audit. Neither can be rerun. Follow the [actual report](reviews/D008-supervised-cycle-actual.md) for the observed result and [HANDOFF](HANDOFF.md) for what remains.
 
 [STATUS](STATUS.md) records current outcomes and limitations. [HANDOFF](HANDOFF.md) records exact revisions, consumed operations and next actions. [ROADMAP](ROADMAP.md) and [REQUIREMENTS](REQUIREMENTS.md) preserve the full objective. Historical detail remains in [the prior context checkpoint](history/CONTEXT_2026-11-03_1036Z.md) and revision-linked reviews rather than conflicting present-tense summaries.

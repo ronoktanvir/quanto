@@ -236,6 +236,44 @@ def test_json_write_canonical_and_finite(tmp_path):
             store.put_bytes(b"x" * (MAX_ARTIFACT_BYTES + 1))
 
 
+def test_large_research_json_is_opt_in_and_keeps_access_rules(tmp_path):
+    from quanto.ledger import LedgerError
+    payload = {"fixture": "x" * (1024 * 1024)}
+    with Provenance(tmp_path) as store:
+        with pytest.raises((LedgerError, ProvenanceError)):
+            store.put_json(payload)
+        digest = store.put_large_json(payload)
+        with pytest.raises(ProvenanceError):
+            store.read_json(digest)
+        assert store.read_large_json(digest) == payload
+        store.tombstone(digest, "invalid_artifact")
+        with pytest.raises(ProvenanceError):
+            store.read_large_json(digest)
+
+
+@pytest.mark.parametrize('value', [
+    {1: 'nonstring key'}, {'x': float('nan')}, {'x': float('inf')}, {'x': object()},
+])
+def test_large_json_remains_strict_on_write(tmp_path, value):
+    with Provenance(tmp_path) as store:
+        with pytest.raises(ProvenanceError):
+            store.put_large_json(value)
+
+
+@pytest.mark.parametrize('raw', [b'{"x":1,"x":2}', b'{"x":1e999}', b'{"x":NaN}', b'\xff'])
+def test_large_json_remains_strict_on_read(tmp_path, raw):
+    with Provenance(tmp_path) as store:
+        digest = store.put_bytes(raw)
+        with pytest.raises(ProvenanceError):
+            store.read_large_json(digest)
+
+
+def test_large_json_retains_artifact_size_cap(tmp_path):
+    with Provenance(tmp_path) as store:
+        with pytest.raises(ProvenanceError):
+            store.put_large_json({'fixture': 'x' * MAX_ARTIFACT_BYTES})
+
+
 @pytest.mark.parametrize("part", ["root", "runtime", "data", "objects", "database"])
 def test_symlink_storage_is_refused(tmp_path, part):
     root, outside = tmp_path / "root", tmp_path / "outside"

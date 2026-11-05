@@ -58,7 +58,28 @@ def _submission(value: object) -> str:
     return value
 
 
-def _strict_json(raw: bytes) -> Any:
+def _artifact_json(value: Any) -> str:
+    """Canonical finite JSON for explicitly large artifacts, never ledger/request envelopes."""
+    def check(item):
+        if isinstance(item, dict):
+            if any(not isinstance(key, str) for key in item):
+                raise ValueError("JSON keys must be strings")
+            for child in item.values():
+                check(child)
+        elif isinstance(item, (list, tuple)):
+            for child in item:
+                check(child)
+        elif item is not None and not isinstance(item, (str, int, float, bool)):
+            raise ValueError("JSON value unsupported")
+    check(value)
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                     allow_nan=False)
+    if len(raw.encode("utf-8")) > MAX_ARTIFACT_BYTES:
+        raise ValueError("Oversized artifact JSON")
+    return raw
+
+
+def _strict_json(raw: bytes, *, large_artifact: bool = False) -> Any:
     def pairs(values):
         result = {}
         for key, value in values:
@@ -71,10 +92,11 @@ def _strict_json(raw: bytes) -> Any:
         raise ValueError("Non-finite JSON number")
 
     try:
-        if len(raw) > MAX_JSON_BYTES:
+        if len(raw) > (MAX_ARTIFACT_BYTES if large_artifact else MAX_JSON_BYTES):
             raise ValueError("Oversized JSON")
         value = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
-        canonical_json(value)  # Also rejects overflow such as 1e999 and excessive nesting.
+        # Also reject overflow such as 1e999, unsupported values and excessive nesting.
+        (_artifact_json if large_artifact else canonical_json)(value)
         return value
     except (ValueError, UnicodeError, RecursionError, OverflowError, TypeError):
         raise ProvenanceError("Artifact is not bounded strict UTF-8 JSON") from None
@@ -523,6 +545,26 @@ class Provenance:
 
     def read_json(self, digest: str) -> Any:
         return _strict_json(self.read_bytes(digest))
+
+    def put_large_json(self, value: Any) -> str:
+        """Opt-in 16 MiB research artifact; existing access/tombstone limits still apply.
+
+        Requests, ledger records, model context, and the ordinary JSON methods keep
+        their existing smaller limits. This method grants no new read authority.
+        """
+        try:
+            self.access.observe_import(unknown_reason="json_input")
+        except AccessError:
+            raise ProvenanceError("Content publication access refused") from None
+        try:
+            raw = _artifact_json(value).encode("utf-8")
+        except (ValueError, UnicodeError, RecursionError, OverflowError, TypeError):
+            raise ProvenanceError("Value must be bounded finite JSON") from None
+        return self.put_bytes(raw)
+
+    def read_large_json(self, digest: str) -> Any:
+        """Read an explicitly large local research artifact with normal access checks."""
+        return _strict_json(self.read_bytes(digest), large_artifact=True)
 
     def tombstone(self, digest: str, reason: str) -> None:
         """Explicitly block retrieval/reuse while retaining only identity and reason."""

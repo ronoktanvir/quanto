@@ -1,5 +1,11 @@
 # Roadmap
 
+## Owner-prioritized research queue
+
+Execute D011's finite, predeclared single-instrument trend screen after exact-build criticism, independent numerical/failure checks and scope review. Preserve every cost scenario and failed/unattempted slot. Use one continuous portfolio trace per candidate/cost combination and clearly label all chronological blocks as historical development evidence. Volatility sizing and reversal stay queued until their additional accounting is implemented. [Research queue](RESEARCH_QUEUE.md) · [D011 policy](D011_POLICY.md).
+
+Complete scoped exposure reconciliation and the isolated evaluator alongside this empirical work. A model's public historical knowledge remains a limitation. Favor a frozen future campaign when historical non-exposure cannot be established, with a reviewed sample/power plan before final access. The current development screen cannot complete the owner's unseen-data requirement.
+
 ## Research desk and client
 
 The deterministic research core, append-only failure records, five bounded research roles and separate quality and scope stages now support one verified manual end-to-end development run. Seven stages published. The numerical audit matched 882 fields while the four research reviews stayed inconclusive. The first three incomplete real attempts remain distinct. Preserve these records and the one-shot controllers. Repeated or unattended operation needs its own evidence. [Actual workflow](reviews/D008-supervised-cycle-actual.md) · [D008 policy](D008_POLICY.md).

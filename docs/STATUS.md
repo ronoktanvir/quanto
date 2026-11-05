@@ -1,5 +1,11 @@
 # Current status
 
+The owner resumed work on November 4 and prioritized actual strategy screening after costs and genuinely unseen evaluation, using the supplied quant-theory sheet as a guide. The [research queue](RESEARCH_QUEUE.md) starts with a finite, single-instrument trend screen. Five independent perspectives and actual Fable 5.1 / Opus 5.5 signed-in CLI reviews informed the [D011 policy](D011_POLICY.md). Both council calls completed once; their USD 2 combined holds remain uncertain. No new market-data acquisition or strategy result has occurred in this increment.
+
+The metric reducer and campaign wrapper are implemented in an isolated source checkout and undergoing independent review. Preliminary checks include 171 passing focused tests and 8,400 separately calculated scalar comparisons on invented paths. These are software evidence, not investment evidence or a final exact-build acceptance. Current protected acquisition still refuses; all planned historical screening remains development-only. D010's unfinished client work is preserved separately.
+
+Cloud-offloaded files stalled reads in the first Documents worktree. The public source edits and adviser reports were recovered into `/Users/ronoktanvir/.codex/worktrees/strategy-research/quanto`; the metric source/test/report hashes were preserved exactly. Original private stores and website supervision were not moved or restarted. The Mac had approximately 5.7 GiB available at the read-only storage observation, so avoid unnecessary large local copies.
+
 Quanto has completed one supervised historical research workflow for the owner’s account. Seven model-backed stages published, including four review decisions. All four reviews were inconclusive. The independent numerical checker matched **882 fields across three cost cases** and checked nine derivative operands. The project ledger settled the seven requests at **USD 0.094694**. The original supervisor and auditor have each been consumed. Separate criticism, quality and scope accepted the bounded result. The lead verified the private source receipts. [Actual run](reviews/D008-supervised-cycle-actual.md) · [Criticism](reviews/D008-supervised-cycle-actual-critic.md) · [Quality](reviews/D008-supervised-cycle-actual-quality.md) · [Scope](reviews/D008-supervised-cycle-actual-scope.md).
 
 ## Research evidence

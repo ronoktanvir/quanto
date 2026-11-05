@@ -1,5 +1,17 @@
 # Resume here
 
+## November 4 owner resume and D011 priority
+
+The owner explicitly resumed work and requested agent-run strategy tests after costs and unseen data. Current work is in `/Users/ronoktanvir/.codex/worktrees/strategy-research/quanto`, branch `codex/strategy-research-local`, based on main `94e0df5`. The Documents research worktree remains preserved after cloud-offloaded source reads stalled. All adviser reports and metric source/test/report were recovered with verified exact hashes. Original root production stores and D010 `codex/registered-research-client` uncommitted implementation are untouched. Do not delete the original files or restart its consumed operations.
+
+Read [D011_POLICY](D011_POLICY.md) and [RESEARCH_QUEUE](RESEARCH_QUEUE.md). Five native perspectives are complete. Actual signed-in Fable 5.1 and Opus 5.5 council calls both completed one turn through reviewed runner `37930bf516fb01a5730e50618d4828348e6f13c4739b4bf5e16ef40ea4135c6a`. Packet `29c52dc46c15b8a04757be40142a0dcdb1a84cb73529cff11f1e3ecc9e42bac7` contained the complete proposal plus attributed summaries. Terminal chunk `c9ede7`, handle `90287`, exited 0. Private receipts are under the original root's `runtime/council-cli/d011/attempt`. Both holds remain uncertain, USD 2 total on November 4 Los Angeles. Do not rerun either call.
+
+Metrics and campaign code are written; the lead added CLI routing and an explicit sixteen-MiB local result-artifact path while preserving smaller request/ledger/default JSON limits. Independent review is underway. Preliminary focused checks passed 171 tests; an independent numerical probe compared 8,400 scalars from 100 invented paths. These are provisional software checks, not exact final-source or historical evidence. The campaign producer is binding design rationale/provenance and resolving critic findings. No D011 production manifest, acquisition, admission or calculation has run.
+
+Next: finish exact-build criticism, quality and scope, commit coherent increments and run relevant clean-checkout validation. Freeze one private campaign before new acquisition through the existing production authority, keep a complete finite roster, and independently reconcile the actual result or retain its observed refusal. Do not create new authority to erase legacy exposure. No protected acquisition is available yet. D008 unseen-data reconciliation/evaluator and prospective statistical planning remain required; no live order is authorized.
+
+The original site's status snapshot records resumed assignments without resetting health/restart history. Update it from observed outcomes as work changes. A read-only disk check found approximately 5.7 GiB available; bound local outputs and avoid broad copies. Source relocation did not move licensed data, credentials or databases.
+
 The owner’s private research desk has one completed, supervised historical development trace. The first three real attempts remain in the record. The fourth published seven stages and four inconclusive research reviews. A distinct audit matched 882 financial fields in three cases and nine derivative operands. All seven paid requests settled at USD 0.094694 in the local ledger. Both real controllers are consumed. [Actual report](reviews/D008-supervised-cycle-actual.md).
 
 ## Actual evidence and safe review

@@ -1,5 +1,13 @@
 # Decision register
 
+## D011 Finite strategy screening
+
+The owner resumed Quanto and asked agents to test strategies after costs and on unseen data. Accept one finite supervised single-instrument trend screen as the next empirical deliverable, while preserving the separate unresolved protected evaluator. The theory sheet is a topic index; original sources and verified accounting govern calculations. Five independently briefed advisers and actual Fable 5.1 / Opus 5.5 CLI critiques informed the decision. [Accepted contract and dispositions](D011_POLICY.md).
+
+The first three or fewer related trend variants use three frozen cost assumptions and identical scored dates. Select only from validation at the declared primary cost, with exact tie rules and permission to select none. Retain every outcome. The old D007 exact-study suite cannot authorize a new grid. Plain supported admissions use a distinct one-use campaign layer; unsupported revised profiles defer. No new historical result, statistical acceptance, protected eligibility or order authority is claimed.
+
+The decisive tradeoff is immediate useful historical evidence versus falsely claiming unseen validation. D010 client delivery and complete external recovery must not delay this supervised screen, but its later historical block remains development-exposed. Future observations require elapsed time and a preregistered statistical plan. Local council estimates totaled about USD 0.414782; the full USD 2 reservations remain uncertain and no retry is permitted.
+
 ## D009 External recovery storage
 
 Status: accepted staged contract in [D009_POLICY.md](D009_POLICY.md), following five independent architecture, security, cost/operations, data-recovery and scope perspectives plus completed actual Fable5.1 and Opus5.5 reviews through local Claude Code OAuth. The owner authorizes up toUSD 50 total Runpod setup spending, with storage targeted aroundUSD5/month; existing model allowances are unchanged.

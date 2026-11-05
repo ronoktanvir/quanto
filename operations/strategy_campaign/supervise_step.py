@@ -16,6 +16,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import select
 import selectors
@@ -129,6 +130,9 @@ def authority_identity(root):
 
 def verify(plan):
     need(plan["command"] in COMMANDS, "command_forbidden")
+    pin = plan.get("attachment_event_sha256")
+    need(pin is None or (type(pin) is str and re.fullmatch(r"[0-9a-f]{64}", pin)),
+         "attachment_pin_invalid")
     need(type(plan["timeout"]) in (int, float) and math.isfinite(plan["timeout"])
          and 0 < plan["timeout"] <= 360, "timeout_invalid")
     need(source_identity(Path(plan["source_root"])) == plan["source_sha256"], "source_mismatch")
@@ -160,7 +164,7 @@ def child(attempt, gate_fd=None):
         # root/device/inode/schema identity; a mismatch is never repaired.
         need(authority_identity(root) == plan["authority"], "authority_changed")
         try:
-            supervisor = Supervisor(root)
+            supervisor = Supervisor(root, attachment_event_sha256=plan.get("attachment_event_sha256"))
         except AccessError as exc:
             print(json.dumps({"child_refusal": exc.reason}), file=sys.stderr)
             return 70
@@ -321,7 +325,8 @@ def _capture(plan, attempt):
 
 
 def supervise_step(*, command, runtime_root, source_root, python, request, attempt,
-                   source_sha256, python_sha256, request_sha256, timeout=120):
+                   source_sha256, python_sha256, request_sha256, timeout=120,
+                   attachment_event_sha256=None):
     """An existing attempt directory is always refused, including after a crash."""
     attempt = Path(attempt)
     physical(attempt.parent, directory=True)
@@ -342,7 +347,8 @@ def supervise_step(*, command, runtime_root, source_root, python, request, attem
         plan = {"command": command, "runtime_root": str(runtime_root), "source_root": str(source_root),
                 "python": str(python), "attempt": str(attempt), "source_sha256": source_sha256,
                 "python_sha256": python_sha256, "request_sha256": request_sha256,
-                "timeout": timeout, "authority": authority_identity(Path(runtime_root))}
+                "timeout": timeout, "authority": authority_identity(Path(runtime_root)),
+                "attachment_event_sha256": attachment_event_sha256}
         verify(plan)
         save(attempt / "intent.json", plan)
         launch_possible = True
@@ -384,6 +390,8 @@ def main():
     for name in ("source-sha256", "python-sha256", "request-sha256"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--timeout", type=float, default=120)
+    parser.add_argument("--attachment-event-sha256", default=None,
+                        help="Exact existing accepted attachment event; never performs repair")
     try:
         result = supervise_step(**vars(parser.parse_args()))
     except Refused as exc:

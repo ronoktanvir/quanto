@@ -6,7 +6,7 @@ The owner resumed Quanto on November 4, 2026 and asked for agents to test which 
 
 | Candidate family | Work now | Status and limit |
 | --- | --- | --- |
-| Slow long/cash trend | Freeze a small finite roster; compare continuous historical traces against the same admitted instrument's buy-and-hold under all declared cost cases. | Protocol review and metric implementation. No new historical result yet. Related lookback choices are multiple trials, not independent strategies. |
+| Slow long/cash trend | Freeze a small finite roster; compare continuous historical traces against the same admitted instrument's buy-and-hold under all declared cost cases. | Protocol, metrics and bounded process supervision implemented and reviewed. Actual launch is blocked on reviewed restart recovery; no new historical result yet. Related lookback choices are multiple trials, not independent strategies. |
 | Unlevered volatility sizing | Compare sizing against its identical unsized signal; account for every rebalance and idle cash. | Deferred: the existing engine has no partial-sizing accounting. Published results conflict and do not establish this adaptation. |
 | Short-horizon reversal | Test whether the effect survives delayed execution, turnover and conservative cost stress. | Deferred: new entry/exit semantics and stronger execution evidence are needed. |
 

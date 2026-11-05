@@ -31,6 +31,8 @@ REASONS = frozenset({
     "effect_mismatch", "effect_uncertain", "effect_started", "unknown_intent",
     "selector_reviewer_overlap", "unknown_reservation", "protected_unavailable",
     "network_forbidden", "invalid_transition", "classification_conflict",
+    "maintenance_busy", "reattachment_limit", "state_mismatch", "chain_mismatch",
+    "attachment_missing", "attachment_conflict", "attachment_mismatch",
 })
 
 
@@ -178,10 +180,22 @@ _ACTIVE_LOCK = threading.RLock()
 
 class Supervisor:
     """Trusted bootstrap/administration, deliberately unavailable to ordinary roles."""
-    def __init__(self, root: Path, *, synthetic=False):
+    def __init__(self, root: Path, *, synthetic=False, attachment_event_sha256=None):
         self.root = Path(root).absolute()
+        self._owner_pid = os.getpid()
         _need(type(synthetic) is bool)
         self.synthetic = synthetic
+        self._attachment_pin = attachment_event_sha256
+        self._binding_ready = False
+        self._attachment_identities = None
+        if attachment_event_sha256 is not None:
+            _digest(attachment_event_sha256)
+            # An explicit attachment never authorizes creating missing authority.
+            from .authority_reattachment import _physical
+            try:
+                _physical(self.root)
+            except OSError:
+                raise AccessError("control_unavailable") from None
         self._cache = False
         self._pool, self._pool_lock = {}, threading.RLock()
         info = _directory(self.root)
@@ -239,27 +253,44 @@ class Supervisor:
             # An existing file is never silently initialized or migrated. Read
             # its binding before any writable connection/schema operation.
             try:
-                with closing(sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True)) as db:
+                from .authority_reattachment import maintenance_gate
+                with maintenance_gate(self.path), closing(sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True)) as db:
                     db.execute("PRAGMA trusted_schema=OFF")
                     rows = dict(db.execute("SELECT name,value FROM configuration"))
-                    _need(set(rows) == set(expected) | {"store_id", "principal", "legacy_unknown"}, "wrong_store")
-                    _need(all(rows[key] == value for key, value in expected.items()), "wrong_store")
-                    _need(rows["legacy_unknown"] in {"True", "False"}, "wrong_store")
-                    _id(rows["store_id"])
-                    _id(rows["principal"])
-                    _need(db.execute("SELECT 1 FROM principals WHERE principal=?", (rows["principal"],)).fetchone(), "wrong_store")
+                    self._validate_binding(db, rows)
             except (OSError, sqlite3.Error):
                 raise AccessError("control_unavailable") from None
             self._check_paths()
         self.store_id, self.principal = rows["store_id"], rows["principal"]
+        self._binding_ready = True
+
+    def _validate_binding(self, db, rows=None):
+        from .authority_reattachment import validate_attachment, _physical
+        rows = dict(db.execute("SELECT name,value FROM configuration")) if rows is None else rows
+        root_info = _directory(self.root)
+        expected = {"root": str(self.root), "device": str(root_info.st_dev), "inode": str(root_info.st_ino),
+                    "synthetic": str(self.synthetic), "schema": "2"}
+        _need(set(rows) == set(expected) | {"store_id", "principal", "legacy_unknown"}, "wrong_store")
+        attached = validate_attachment(db, self.root, rows, self._attachment_pin)
+        _need(all(rows[key] == value for key, value in expected.items() if key != "device" or not attached), "wrong_store")
+        _need(rows["legacy_unknown"] in {"True", "False"}, "wrong_store")
+        _id(rows["store_id"])
+        _id(rows["principal"])
+        _need(db.execute("SELECT 1 FROM principals WHERE principal=?", (rows["principal"],)).fetchone(), "wrong_store")
+        if attached:
+            self._attachment_identities = _physical(self.root)
 
     def _check_paths(self):
+        _need(os.getpid() == self._owner_pid, "authority_closed")
         _need(stat.S_IMODE(_directory(self.path.parent).st_mode) == 0o700, "unsafe_control_store")
         info = _private_file(self.path)
         if hasattr(self, "_file_identity"):
             _need((info.st_dev, info.st_ino) == self._file_identity, "wrong_store")
             root_info = _directory(self.root)
             _need((root_info.st_dev, root_info.st_ino) == self._root_identity, "wrong_store")
+        if self._attachment_identities is not None:
+            from .authority_reattachment import _physical
+            _need(_physical(self.root) == self._attachment_identities, "wrong_store")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=2, isolation_level=None, check_same_thread=False)
@@ -279,8 +310,12 @@ class Supervisor:
     @contextmanager
     def _db(self):
         db, lock, borrowed = None, None, False
+        gate = None
         try:
             self._check_paths()
+            from .authority_reattachment import maintenance_gate
+            gate = maintenance_gate(self.path)
+            gate.__enter__()
             with self._pool_lock:
                 if self._cache:
                     key = threading.get_ident()
@@ -291,14 +326,20 @@ class Supervisor:
                     borrowed = True
                 else:
                     db = self._connect()
+            if self._binding_ready:
+                self._validate_binding(db)
             yield db
         except (OSError, sqlite3.Error):
             raise AccessError("control_unavailable") from None
         finally:
-            if borrowed:
-                lock.release()
-            elif db is not None:
-                db.close()
+            try:
+                if borrowed:
+                    lock.release()
+                elif db is not None:
+                    db.close()
+            finally:
+                if gate is not None:
+                    gate.__exit__(None, None, None)
 
     @contextmanager
     def _transaction(self):
@@ -529,6 +570,7 @@ class AccessSession:
         self._active, self._closed = False, False
         self._grants, self._grant_lock = {}, threading.RLock()
         self._producers, self._publications = {}, {}
+        self._maintenance_gate = None
 
     @property
     def principal(self):
@@ -547,11 +589,19 @@ class AccessSession:
         with _ACTIVE_LOCK:
             _need(not self._closed, "authority_closed")
             _need(_ACTIVE is None, "authority_already_active")
-            self.supervisor._validate_session_principal(self.principal)
-            self._active = True
-            with self.supervisor._pool_lock:
-                self.supervisor._cache = True
-            _ACTIVE = self
+            from .authority_reattachment import maintenance_gate
+            gate = maintenance_gate(self.supervisor.path)
+            gate.__enter__()
+            try:
+                self.supervisor._validate_session_principal(self.principal)
+                self._active = True
+                with self.supervisor._pool_lock:
+                    self.supervisor._cache = True
+                _ACTIVE = self
+                self._maintenance_gate = gate
+            except BaseException:
+                gate.__exit__(None, None, None)
+                raise
         return self
 
     def __exit__(self, *_):
@@ -565,8 +615,13 @@ class AccessSession:
                 self._grants.clear()
                 self._producers.clear()
                 self._publications.clear()
-            self.supervisor._close_connections()
-            _ACTIVE = None
+            try:
+                self.supervisor._close_connections()
+            finally:
+                _ACTIVE = None
+                if self._maintenance_gate is not None:
+                    self._maintenance_gate.__exit__(None, None, None)
+                    self._maintenance_gate = None
 
     def check(self, root=None):
         _need(self._active and _ACTIVE is self, "authority_closed")
